@@ -1,157 +1,316 @@
-import React, { useEffect, useRef, useState } from 'react'
-import Nav from './NaV.JSX'
-import { categories } from '../category'
-import CategoryCard from './CategoryCard'
-import { FaCircleChevronLeft } from "react-icons/fa6";
-import { FaCircleChevronRight } from "react-icons/fa6";
+import React, { useEffect, useRef, useState } from 'react';
+import Nav from './Nav';
+import { categories } from '../category';
+import CategoryCard from './CategoryCard';
+import { FaCircleChevronLeft, FaCircleChevronRight } from "react-icons/fa6";
+import { FaStar, FaFilter, FaMotorcycle, FaTag, FaSearch } from "react-icons/fa";
 import { useSelector } from 'react-redux';
 import FoodCard from './FoodCard';
+import RestaurantCard from './RestaurantCard';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { serverUrl } from '../App';
+import ReelTeaserStrip from './ReelTeaserStrip';
+import MobileBottomTab from './MobileBottomTab';
 
 function UserDashboard() {
-  const {currentCity,shopInMyCity,itemsInMyCity,searchItems}=useSelector(state=>state.user)
-  const cateScrollRef=useRef()
-  const shopScrollRef=useRef()
-  const navigate=useNavigate()
-  const [showLeftCateButton,setShowLeftCateButton]=useState(false)
-  const [showRightCateButton,setShowRightCateButton]=useState(false)
-   const [showLeftShopButton,setShowLeftShopButton]=useState(false)
-  const [showRightShopButton,setShowRightShopButton]=useState(false)
-  const [updatedItemsList,setUpdatedItemsList]=useState([])
+  const { currentCity, shopInMyCity, itemsInMyCity, searchItems } = useSelector(state => state.user);
+  const cateScrollRef = useRef();
+  const shopScrollRef = useRef();
+  const searchInputRef = useRef();
+  const navigate = useNavigate();
 
-const handleFilterByCategory=(category)=>{
-if(category=="All"){
-  setUpdatedItemsList(itemsInMyCity)
-}else{
-  const filteredList=itemsInMyCity?.filter(i=>i.category===category)
-  setUpdatedItemsList(filteredList)
-}
+  const [showLeftCateButton, setShowLeftCateButton] = useState(false);
+  const [showRightCateButton, setShowRightCateButton] = useState(false);
+  const [updatedItemsList, setUpdatedItemsList] = useState([]);
+  const [filteredShopsList, setFilteredShopsList] = useState([]);
+  const [activeCategory, setActiveCategory] = useState("All");
 
-}
+  // Filters state
+  const [ratingFilter, setRatingFilter] = useState(false);
+  const [vegFilter, setVegFilter] = useState(false);
+  const [fastDeliveryFilter, setFastDeliveryFilter] = useState(false);
 
-useEffect(()=>{
-setUpdatedItemsList(itemsInMyCity)
-},[itemsInMyCity])
+  useEffect(() => {
+    setUpdatedItemsList(itemsInMyCity);
+  }, [itemsInMyCity]);
 
+  useEffect(() => {
+    let shops = shopInMyCity ? [...shopInMyCity] : [];
+    if (ratingFilter) {
+      shops = shops.filter(s => (s.rating?.average || 4.2) >= 4.0);
+    }
+    setFilteredShopsList(shops);
+  }, [shopInMyCity, ratingFilter]);
 
-  const updateButton=(ref,setLeftButton,setRightButton)=>{
-const element=ref.current
-if(element){
-setLeftButton(element.scrollLeft>0)
-setRightButton(element.scrollLeft+element.clientWidth<element.scrollWidth)
+  const handleFilterByCategory = (category) => {
+    setActiveCategory(category);
+    if (category === "All") {
+      setUpdatedItemsList(itemsInMyCity);
+    } else {
+      let filtered = itemsInMyCity?.filter(i => i.category === category);
+      if (vegFilter) {
+        filtered = filtered?.filter(i => i.foodType === "veg");
+      }
+      setUpdatedItemsList(filtered);
+    }
+  };
 
-}
-  }
-  const scrollHandler=(ref,direction)=>{
-    if(ref.current){
+  const handleVegToggle = () => {
+    const nextVeg = !vegFilter;
+    setVegFilter(nextVeg);
+    if (nextVeg) {
+      const filtered = (activeCategory === "All" ? itemsInMyCity : itemsInMyCity?.filter(i => i.category === activeCategory))?.filter(i => i.foodType === "veg");
+      setUpdatedItemsList(filtered);
+    } else {
+      handleFilterByCategory(activeCategory);
+    }
+  };
+
+  const updateButton = (ref, setLeftButton, setRightButton) => {
+    const element = ref.current;
+    if (element) {
+      setLeftButton(element.scrollLeft > 0);
+      setRightButton(element.scrollLeft + element.clientWidth < element.scrollWidth);
+    }
+  };
+
+  const scrollHandler = (ref, direction) => {
+    if (ref.current) {
       ref.current.scrollBy({
-        left:direction=="left"?-200:200,
-        behavior:"smooth"
-      })
+        left: direction === "left" ? -250 : 250,
+        behavior: "smooth"
+      });
     }
-  }
+  };
 
-
-
-
-  useEffect(()=>{
-    if(cateScrollRef.current){
-      updateButton(cateScrollRef,setShowLeftCateButton,setShowRightCateButton)
-      updateButton(shopScrollRef,setShowLeftShopButton,setShowRightShopButton)
-      cateScrollRef.current.addEventListener('scroll',()=>{
-        updateButton(cateScrollRef,setShowLeftCateButton,setShowRightCateButton)
-      })
-      shopScrollRef.current.addEventListener('scroll',()=>{
-         updateButton(shopScrollRef,setShowLeftShopButton,setShowRightShopButton)
-      })
-     
+  useEffect(() => {
+    if (cateScrollRef.current) {
+      updateButton(cateScrollRef, setShowLeftCateButton, setShowRightCateButton);
+      const cateElem = cateScrollRef.current;
+      const onCateScroll = () => updateButton(cateScrollRef, setShowLeftCateButton, setShowRightCateButton);
+      cateElem?.addEventListener('scroll', onCateScroll);
+      return () => cateElem?.removeEventListener('scroll', onCateScroll);
     }
+  }, [categories]);
 
-    return ()=>{cateScrollRef?.current?.removeEventListener("scroll",()=>{
-        updateButton(cateScrollRef,setShowLeftCateButton,setShowRightCateButton)
-      })
-         shopScrollRef?.current?.removeEventListener("scroll",()=>{
-        updateButton(shopScrollRef,setShowLeftShopButton,setShowRightShopButton)
-      })}
-
-  },[categories])
-
+  // Promotional Banner Items
+  const promoBanners = [
+    {
+      id: 1,
+      title: "50% OFF UP TO ₹100",
+      subtitle: "On your first 3 food orders",
+      code: "USE CODE: REELBITE50",
+      bg: "from-[#ff5200] to-red-600",
+      image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=600&auto=format&fit=crop"
+    },
+    {
+      id: 2,
+      title: "FREE DELIVERY",
+      subtitle: "On top rated restaurants in " + (currentCity || "your city"),
+      code: "NO CODE REQUIRED",
+      bg: "from-amber-600 to-[#ff5200]",
+      image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=600&auto=format&fit=crop"
+    },
+    {
+      id: 3,
+      title: "FLAT ₹125 OFF",
+      subtitle: "Gourmet biryani & Chinese combos",
+      code: "USE CODE: CRAVING125",
+      bg: "from-indigo-600 to-purple-700",
+      image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?q=80&w=600&auto=format&fit=crop"
+    }
+  ];
 
   return (
-    <div className='w-screen min-h-screen flex flex-col gap-5 items-center bg-[#fff9f6] overflow-y-auto'>
+    <div className='w-full min-h-screen flex flex-col bg-[#f8f9fa] text-stone-900 font-sans pb-20 md:pb-12'>
+      {/* Top Navbar */}
       <Nav />
 
-      {searchItems && searchItems.length>0 && (
-        <div className='w-full max-w-6xl flex flex-col gap-5 items-start p-5 bg-white shadow-md rounded-2xl mt-4'>
-<h1 className='text-gray-900 text-2xl sm:text-3xl font-semibold border-b border-gray-200 pb-2'>
-  Search Results
-</h1>
-<div className='w-full h-auto flex flex-wrap gap-6 justify-center'>
-  {searchItems.map((item)=>(
-    <FoodCard data={item} key={item._id}/>
-  ))}
-</div>
-        </div>
-      )}
+      {/* Main Container */}
+      <main className="pt-24 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 space-y-8">
 
-      <div className="w-full max-w-6xl flex flex-col gap-5 items-start p-[10px]">
+        {/* Promotional Banner Carousel */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {promoBanners.map((banner) => (
+            <div
+              key={banner.id}
+              className={`bg-gradient-to-r ${banner.bg} text-white p-5 rounded-2xl shadow-md flex items-center justify-between relative overflow-hidden group cursor-pointer`}
+            >
+              <div className="space-y-1.5 z-10 max-w-[65%]">
+                <span className="text-[10px] font-black uppercase bg-black/30 px-2 py-0.5 rounded-full tracking-wider">
+                  {banner.code}
+                </span>
+                <h3 className="text-xl font-black leading-tight tracking-tight">{banner.title}</h3>
+                <p className="text-xs text-white/90 font-medium">{banner.subtitle}</p>
+              </div>
 
-        <h1 className='text-gray-800 text-2xl sm:text-3xl'>Inspiration for your first order</h1>
-        <div className='w-full relative'>
-          {showLeftCateButton &&  <button className='absolute left-0 top-1/2 -translate-y-1/2 bg-[#ff4d2d] text-white p-2 rounded-full shadow-lg hover:bg-[#e64528] z-10' onClick={()=>scrollHandler(cateScrollRef,"left")}><FaCircleChevronLeft />
-          </button>}
-         
+              <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-white/30 shadow-lg shrink-0 group-hover:scale-110 transition duration-500">
+                <img src={banner.image} alt={banner.title} className="w-full h-full object-cover" />
+              </div>
+            </div>
+          ))}
+        </section>
 
-          <div className='w-full flex overflow-x-auto gap-4 pb-2 ' ref={cateScrollRef}>
-            {categories.map((cate, index) => (
-              <CategoryCard name={cate.category} image={cate.image} key={index} onClick={()=>handleFilterByCategory(cate.category)}/>
-            ))}
+        {/* Search Results if any */}
+        {searchItems && searchItems.length > 0 && (
+          <section className="bg-white border border-stone-200 p-6 rounded-2xl shadow-sm space-y-4">
+            <h2 className="text-xl font-extrabold text-stone-900 border-b border-stone-100 pb-3 flex items-center gap-2">
+              <span className="text-[#ff5200]">🔍</span>
+              <span>Search Results for "{searchItems.length} items found"</span>
+            </h2>
+            <div className="flex flex-wrap gap-6 justify-center">
+              {searchItems.map((item) => (
+                <FoodCard data={item} key={item._id} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Cuisine / Category Scrollable Chip Row */}
+        <section className="space-y-3">
+          <h2 className="text-lg sm:text-xl font-extrabold text-stone-900 tracking-tight">
+            What's on your mind?
+          </h2>
+
+          <div className="relative">
+            {showLeftCateButton && (
+              <button
+                className="absolute -left-3 top-1/2 -translate-y-1/2 bg-white text-stone-800 p-2.5 rounded-full shadow-lg border border-stone-200 hover:bg-[#ff5200] hover:text-white z-10 transition"
+                onClick={() => scrollHandler(cateScrollRef, "left")}
+              >
+                <FaCircleChevronLeft size={16} />
+              </button>
+            )}
+
+            <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-none snap-x" ref={cateScrollRef}>
+              <button
+                onClick={() => handleFilterByCategory("All")}
+                className={`flex-none px-5 py-2.5 rounded-2xl font-bold text-xs transition border shadow-sm ${
+                  activeCategory === "All"
+                    ? "bg-[#ff5200] text-white border-[#ff5200]"
+                    : "bg-white text-stone-700 border-stone-200 hover:border-[#ff5200]"
+                }`}
+              >
+                All Cuisines
+              </button>
+
+              {categories.map((cate, index) => (
+                <CategoryCard
+                  name={cate.category}
+                  image={cate.image}
+                  key={index}
+                  onClick={() => handleFilterByCategory(cate.category)}
+                />
+              ))}
+            </div>
+
+            {showRightCateButton && (
+              <button
+                className="absolute -right-3 top-1/2 -translate-y-1/2 bg-white text-stone-800 p-2.5 rounded-full shadow-lg border border-stone-200 hover:bg-[#ff5200] hover:text-white z-10 transition"
+                onClick={() => scrollHandler(cateScrollRef, "right")}
+              >
+                <FaCircleChevronRight size={16} />
+              </button>
+            )}
           </div>
-          {showRightCateButton &&  <button className='absolute right-0 top-1/2 -translate-y-1/2 bg-[#ff4d2d] text-white p-2 rounded-full shadow-lg hover:bg-[#e64528] z-10' onClick={()=>scrollHandler(cateScrollRef,"right")}>
-<FaCircleChevronRight />
-          </button>}
-         
-        </div>
-      </div>
+        </section>
 
-      <div className='w-full max-w-6xl flex flex-col gap-5 items-start p-[10px]'>
- <h1 className='text-gray-800 text-2xl sm:text-3xl'>Best Shop in {currentCity}</h1>
- <div className='w-full relative'>
-          {showLeftShopButton &&  <button className='absolute left-0 top-1/2 -translate-y-1/2 bg-[#ff4d2d] text-white p-2 rounded-full shadow-lg hover:bg-[#e64528] z-10' onClick={()=>scrollHandler(shopScrollRef,"left")}><FaCircleChevronLeft />
-          </button>}
-         
+        {/* Reels Near You Strip */}
+        <ReelTeaserStrip />
 
-          <div className='w-full flex overflow-x-auto gap-4 pb-2 ' ref={shopScrollRef}>
-            {shopInMyCity?.map((shop, index) => (
-              <CategoryCard name={shop.name} image={shop.image} key={index} onClick={()=>navigate(`/shop/${shop._id}`)}/>
-            ))}
+        {/* Filter & Sort Action Bar */}
+        <section className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-stone-200">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight">
+              Restaurants in {currentCity || "City"}
+            </h2>
+            <p className="text-xs text-stone-500 font-medium">Explore top rated kitchens delivering near you</p>
           </div>
-          {showRightShopButton &&  <button className='absolute right-0 top-1/2 -translate-y-1/2 bg-[#ff4d2d] text-white p-2 rounded-full shadow-lg hover:bg-[#e64528] z-10' onClick={()=>scrollHandler(shopScrollRef,"right")}>
-<FaCircleChevronRight />
-          </button>}
-         
-        </div>
-      </div>
 
-      <div className='w-full max-w-6xl flex flex-col gap-5 items-start p-[10px]'>
-       <h1 className='text-gray-800 text-2xl sm:text-3xl'>
-        Suggested Food Items
-       </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Pure Veg Filter Chip */}
+            <button
+              onClick={handleVegToggle}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition flex items-center gap-1.5 ${
+                vegFilter
+                  ? "bg-emerald-700 text-white border-emerald-700 shadow"
+                  : "bg-white text-stone-700 border-stone-300 hover:border-emerald-600"
+              }`}
+            >
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+              <span>Pure Veg</span>
+            </button>
 
-<div className='w-full h-auto flex flex-wrap gap-[20px] justify-center'>
-{updatedItemsList?.map((item,index)=>(
-  <FoodCard key={index} data={item}/>
-))}
-</div>
+            {/* Rating 4.0+ Chip */}
+            <button
+              onClick={() => setRatingFilter(!ratingFilter)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition flex items-center gap-1.5 ${
+                ratingFilter
+                  ? "bg-[#ff5200] text-white border-[#ff5200] shadow"
+                  : "bg-white text-stone-700 border-stone-300 hover:border-[#ff5200]"
+              }`}
+            >
+              <FaStar className="text-yellow-400" size={12} />
+              <span>Rating 4.0+</span>
+            </button>
 
+            {/* Fast Delivery Chip */}
+            <button
+              onClick={() => setFastDeliveryFilter(!fastDeliveryFilter)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition flex items-center gap-1.5 ${
+                fastDeliveryFilter
+                  ? "bg-stone-900 text-white border-stone-900 shadow"
+                  : "bg-white text-stone-700 border-stone-300 hover:border-stone-800"
+              }`}
+            >
+              <FaMotorcycle size={14} />
+              <span>Fast Delivery</span>
+            </button>
+          </div>
+        </section>
 
-      </div>
+        {/* Restaurant Listing Grid */}
+        <section className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 justify-items-center">
+            {filteredShopsList && filteredShopsList.length > 0 ? (
+              filteredShopsList.map((shop) => (
+                <RestaurantCard
+                  key={shop._id}
+                  shop={shop}
+                  onClick={() => navigate(`/shop/${shop._id}`)}
+                />
+              ))
+            ) : (
+              <div className="col-span-full py-12 text-center text-stone-500 text-sm">
+                No restaurants found matching your filters in {currentCity || "your area"}.
+              </div>
+            )}
+          </div>
+        </section>
 
+        {/* Popular Food Items Section */}
+        <section className="space-y-4 pt-6 border-t border-stone-200">
+          <h2 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight">
+            Popular Dishes Near You
+          </h2>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 justify-items-center">
+            {updatedItemsList && updatedItemsList.length > 0 ? (
+              updatedItemsList.map((item, index) => (
+                <FoodCard key={index} data={item} />
+              ))
+            ) : (
+              <div className="col-span-full py-12 text-center text-stone-500 text-sm">
+                No food items found for this selection.
+              </div>
+            )}
+          </div>
+        </section>
+      </main>
+
+      {/* Mobile Bottom Tab Bar */}
+      <MobileBottomTab />
     </div>
-  )
+  );
 }
 
-export default UserDashboard
+export default UserDashboard;

@@ -10,6 +10,7 @@ import userRouter from "./routes/user.routes.js"
 import itemRouter from "./routes/item.routes.js"
 import shopRouter from "./routes/shop.routes.js"
 import orderRouter from "./routes/order.routes.js"
+import reelRouter from "./routes/reel.routes.js"
 import http from "http"
 import { Server } from "socket.io"
 import { socketHandler } from "./socket.js"
@@ -27,8 +28,6 @@ const io=new Server(server,{
 
 app.set("io",io)
 
-
-
 const port=process.env.PORT || 5000
 app.use(cors({
     origin:"http://localhost:5173",
@@ -36,11 +35,13 @@ app.use(cors({
 }))
 app.use(express.json())
 app.use(cookieParser())
+app.use(express.static("public"))
 app.use("/api/auth",authRouter)
 app.use("/api/user",userRouter)
 app.use("/api/shop",shopRouter)
 app.use("/api/item",itemRouter)
 app.use("/api/order",orderRouter)
+app.use("/api/reels",reelRouter)
 
 socketHandler(io)
 server.listen(port,()=>{
