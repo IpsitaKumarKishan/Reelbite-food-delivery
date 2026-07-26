@@ -16,8 +16,17 @@ const reelRouter = express.Router();
 reelRouter.get("/", getAllReels);
 reelRouter.get("/owner/:ownerId", getOwnerReels);
 
-// Protected routes
-reelRouter.post("/", isAuth, isOwner, uploadVideo.single("video"), createReel);
+// Protected routes (support uploading video + optional dish image)
+reelRouter.post(
+  "/",
+  isAuth,
+  isOwner,
+  uploadVideo.fields([
+    { name: "video", maxCount: 1 },
+    { name: "image", maxCount: 1 },
+  ]),
+  createReel
+);
 reelRouter.patch("/:id/like", isAuth, toggleLikeReel);
 reelRouter.delete("/:id", isAuth, isOwner, deleteReel);
 

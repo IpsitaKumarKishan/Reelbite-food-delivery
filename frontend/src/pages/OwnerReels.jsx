@@ -4,7 +4,7 @@ import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { serverUrl } from "../App";
 import Nav from "../components/Nav";
-import { FaTrash, FaUpload, FaFilm, FaArrowLeft, FaCheckCircle, FaUtensils, FaPlus } from "react-icons/fa";
+import { FaTrash, FaUpload, FaFilm, FaArrowLeft, FaCheckCircle, FaUtensils, FaImage } from "react-icons/fa";
 
 const OwnerReels = () => {
   const { userData } = useSelector((state) => state.user);
@@ -22,7 +22,8 @@ const OwnerReels = () => {
   const [itemPrice, setItemPrice] = useState("");
   const [itemCategory, setItemCategory] = useState("Snacks");
   const [itemFoodType, setItemFoodType] = useState("veg");
-  const [itemImage, setItemImage] = useState("");
+  const [itemImageFile, setItemImageFile] = useState(null);
+  const [itemImagePreview, setItemImagePreview] = useState(null);
 
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -58,14 +59,12 @@ const OwnerReels = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate type
     const validTypes = ["video/mp4", "video/webm", "video/quicktime"];
     if (!validTypes.includes(file.type) && !file.type.startsWith("video/")) {
       setMessage({ type: "error", text: "Please select a valid video file (MP4, MOV, WEBM)" });
       return;
     }
 
-    // Validate size (100MB)
     if (file.size > 100 * 1024 * 1024) {
       setMessage({ type: "error", text: "Video file size must be less than 100MB" });
       return;
@@ -74,6 +73,14 @@ const OwnerReels = () => {
     setVideoFile(file);
     setVideoPreview(URL.createObjectURL(file));
     setMessage({ type: "", text: "" });
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setItemImageFile(file);
+      setItemImagePreview(URL.createObjectURL(file));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -103,7 +110,9 @@ const OwnerReels = () => {
       formData.append("itemPrice", itemPrice);
       formData.append("itemCategory", itemCategory);
       formData.append("itemFoodType", itemFoodType);
-      if (itemImage) formData.append("itemImage", itemImage);
+      if (itemImageFile) {
+        formData.append("image", itemImageFile);
+      }
     } else {
       formData.append("foodItem", selectedFoodItem);
     }
@@ -130,7 +139,8 @@ const OwnerReels = () => {
       setSelectedFoodItem("");
       setItemName("");
       setItemPrice("");
-      setItemImage("");
+      setItemImageFile(null);
+      setItemImagePreview(null);
       setIsInlineCreation(false);
       fetchMyReels();
     } catch (err) {
@@ -208,7 +218,7 @@ const OwnerReels = () => {
             </h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Video Picker */}
+              {/* Video File Picker */}
               <div>
                 <label className="block text-[11px] font-black text-stone-300 uppercase tracking-wider mb-2">
                   Select Video File (MP4/MOV, Max 100MB)
@@ -254,7 +264,7 @@ const OwnerReels = () => {
               </div>
 
               {/* Linked Food Dish Selection Mode */}
-              <div className="space-y-2 pt-2 border-t border-stone-800">
+              <div className="space-y-3 pt-2 border-t border-stone-800">
                 <label className="block text-[11px] font-black text-stone-300 uppercase tracking-wider">
                   Linked Food Item *
                 </label>
@@ -300,8 +310,11 @@ const OwnerReels = () => {
                     </select>
                   </div>
                 ) : (
-                  <div className="space-y-3 p-3 bg-stone-950 border border-stone-800 rounded-2xl">
-                    <h4 className="text-xs font-black text-amber-400">Create New Menu Dish</h4>
+                  <div className="space-y-3 p-4 bg-stone-950 border border-stone-800 rounded-2xl">
+                    <h4 className="text-xs font-black text-[#ff5200] flex items-center gap-1.5">
+                      <FaUtensils />
+                      <span>Create New Menu Dish</span>
+                    </h4>
 
                     <div>
                       <input
@@ -346,14 +359,27 @@ const OwnerReels = () => {
                       </select>
                     </div>
 
+                    {/* Dish Image File Upload Option */}
                     <div>
+                      <label className="block text-[11px] font-black text-stone-300 uppercase tracking-wider mb-1 flex items-center gap-1">
+                        <FaImage className="text-[#ff5200]" />
+                        <span>Upload Dish Image</span>
+                      </label>
                       <input
-                        type="text"
-                        placeholder="Image URL (Optional)"
-                        value={itemImage}
-                        onChange={(e) => setItemImage(e.target.value)}
-                        className="w-full bg-stone-900 border border-stone-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-[#ff5200]"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="w-full bg-stone-900 border border-stone-800 rounded-xl p-2 text-xs text-stone-300 focus:outline-none focus:border-[#ff5200] file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#ff5200] file:text-white hover:file:bg-[#c2410c]"
                       />
+                      {itemImagePreview && (
+                        <div className="mt-2 relative w-20 h-20 rounded-xl overflow-hidden border border-stone-700">
+                          <img
+                            src={itemImagePreview}
+                            alt="Dish Preview"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

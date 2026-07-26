@@ -1,27 +1,42 @@
 import Reel from "../models/reel.model.js";
 import Shop from "../models/shop.model.js";
 import Item from "../models/item.model.js";
-import { uploadVideoOnCloudinary } from "../utils/cloudinary.js";
+import uploadOnCloudinary, { uploadVideoOnCloudinary } from "../utils/cloudinary.js";
 import fs from "fs";
+import path from "path";
 
 export const createReel = async (req, res) => {
   try {
-    if (!req.file) {
+    const videoFile = req.files?.["video"]?.[0] || req.file;
+    if (!videoFile) {
       return res.status(400).json({ message: "Video file is required" });
     }
 
-    const videoUrl = await uploadVideoOnCloudinary(req.file.path);
+    const videoUrl = await uploadVideoOnCloudinary(videoFile.path);
     if (!videoUrl) {
       return res.status(500).json({ message: "Failed to process video file" });
     }
 
-    const { caption, foodItem, createInlineItem, itemName, itemPrice, itemCategory, itemFoodType, itemImage } = req.body;
+    const { caption, foodItem, createInlineItem, itemName, itemPrice, itemCategory, itemFoodType } = req.body;
     const ownerId = req.userId;
 
     // Find owner shop
     const shop = await Shop.findOne({ owner: ownerId });
 
     let targetFoodItemId = foodItem;
+
+    // Handle uploaded dish image if provided
+    let uploadedDishImageUrl = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=500&auto=format&fit=crop";
+    const imageFile = req.files?.["image"]?.[0];
+    if (imageFile) {
+      const cloudinaryUrl = await uploadOnCloudinary(imageFile.path);
+      if (cloudinaryUrl) {
+        uploadedDishImageUrl = cloudinaryUrl;
+      } else {
+        const fileName = path.basename(imageFile.path);
+        uploadedDishImageUrl = `/reels/${fileName}`;
+      }
+    }
 
     // If owner opted to create a new food dish inline while uploading the reel
     if (createInlineItem === "true" || (itemName && itemPrice)) {
@@ -34,7 +49,7 @@ export const createReel = async (req, res) => {
         price: Number(itemPrice),
         category: itemCategory || "Snacks",
         foodType: itemFoodType || "veg",
-        image: itemImage || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=500&auto=format&fit=crop",
+        image: uploadedDishImageUrl,
         shop: shop ? shop._id : null,
       });
 
@@ -72,8 +87,10 @@ export const createReel = async (req, res) => {
       reel: populatedReel,
     });
   } catch (error) {
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+    if (req.files) {
+      Object.values(req.files).flat().forEach((f) => {
+        if (f && fs.existsSync(f.path)) fs.unlinkSync(f.path);
+      });
     }
     console.error("Create reel error:", error);
     return res.status(500).json({ message: "Server error creating reel", error: error.message });
@@ -164,7 +181,6 @@ export const deleteReel = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized to delete this reel" });
     }
 
-    // Delete ONLY the Reel document. The underlying Item document remains intact in the owner's menu.
     await Reel.findByIdAndDelete(id);
     return res.status(200).json({ message: "Reel deleted successfully" });
   } catch (error) {
