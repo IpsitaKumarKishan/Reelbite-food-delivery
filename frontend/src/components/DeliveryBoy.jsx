@@ -19,6 +19,7 @@ function DeliveryBoy() {
 const [deliveryBoyLocation,setDeliveryBoyLocation]=useState(null)
 const [loading,setLoading]=useState(false)
 const [message,setMessage]=useState("")
+const [receivedOtp,setReceivedOtp]=useState("")
   useEffect(()=>{
 if(!socket || userData.role!=="deliveryBoy") return
 let watchId
@@ -99,8 +100,11 @@ const totalEarning=todayDeliveries.reduce((sum,d)=>sum + d.count*ratePerDelivery
         orderId:currentOrder._id,shopOrderId:currentOrder.shopOrder._id
       },{withCredentials:true})
       setLoading(false)
-       setShowOtpBox(true)
-    console.log(result.data)
+      setShowOtpBox(true)
+      if (result.data.otp) {
+        setReceivedOtp(result.data.otp)
+      }
+      console.log(result.data)
     } catch (error) {
       console.log(error)
       setLoading(false)
@@ -208,8 +212,14 @@ availableAssignments.map((a,index)=>(
       }}} />
 {!showOtpBox ? <button className='mt-4 w-full bg-green-500 text-white font-semibold py-2 px-4 rounded-xl shadow-md hover:bg-green-600 active:scale-95 transition-all duration-200' onClick={sendOtp} disabled={loading}>
 {loading?<ClipLoader size={20} color='white'/> :"Mark As Delivered"}
- </button>:<div className='mt-4 p-4 border rounded-xl bg-gray-50'>
-<p className='text-sm font-semibold mb-2'>Enter OTP sent to email <span className='text-orange-500'>{currentOrder?.user?.email || currentOrder?.user?.fullName}</span></p>
+ </button>:<div className='mt-4 p-4 border rounded-xl bg-gray-50 space-y-2'>
+<p className='text-sm font-semibold mb-1'>Enter OTP sent to email <span className='text-orange-500'>{currentOrder?.user?.email || currentOrder?.user?.fullName}</span></p>
+{receivedOtp && (
+  <div className="bg-amber-100 border border-amber-300 text-amber-900 px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between">
+    <span>🔑 Generated OTP:</span>
+    <span className="text-[#ff5200] font-black text-sm tracking-wider">{receivedOtp}</span>
+  </div>
+)}
 <input type="text" className='w-full border px-3 py-2 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-orange-400' placeholder='Enter OTP' onChange={(e)=>setOtp(e.target.value)} value={otp}/>
 {message && <p className='text-center text-green-400 text-2xl mb-4'>{message}</p>}
 
