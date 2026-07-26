@@ -209,7 +209,7 @@ availableAssignments.map((a,index)=>(
 {!showOtpBox ? <button className='mt-4 w-full bg-green-500 text-white font-semibold py-2 px-4 rounded-xl shadow-md hover:bg-green-600 active:scale-95 transition-all duration-200' onClick={sendOtp} disabled={loading}>
 {loading?<ClipLoader size={20} color='white'/> :"Mark As Delivered"}
  </button>:<div className='mt-4 p-4 border rounded-xl bg-gray-50'>
-<p className='text-sm font-semibold mb-2'>Enter OTP sent to phone number <span className='text-orange-500'>{currentOrder?.user?.mobile || currentOrder?.user?.fullName}</span></p>
+<p className='text-sm font-semibold mb-2'>Enter OTP sent to email <span className='text-orange-500'>{currentOrder?.user?.email || currentOrder?.user?.fullName}</span></p>
 <input type="text" className='w-full border px-3 py-2 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-orange-400' placeholder='Enter OTP' onChange={(e)=>setOtp(e.target.value)} value={otp}/>
 {message && <p className='text-center text-green-400 text-2xl mb-4'>{message}</p>}
 

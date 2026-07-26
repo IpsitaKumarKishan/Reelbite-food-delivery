@@ -3,7 +3,6 @@ import Order from "../models/order.model.js"
 import Shop from "../models/shop.model.js"
 import User from "../models/user.model.js"
 import { sendDeliveryOtpMail } from "../utils/mail.js"
-import { sendDeliveryOtpSms } from "../utils/sms.js"
 import RazorPay from "razorpay"
 import dotenv from "dotenv"
 import { count } from "console"
@@ -503,18 +502,17 @@ export const sendDeliveryOtp = async (req, res) => {
         shopOrder.otpExpires = Date.now() + 5 * 60 * 1000
         await order.save()
 
-        const customerMobile = order?.user?.mobile;
-
-        // Dispatch OTP to customer phone number via SMS
-        if (customerMobile) {
-            await sendDeliveryOtpSms(customerMobile, otp);
+        try {
+            await sendDeliveryOtpMail(order.user, otp)
+        } catch (mailError) {
+            console.log("Nodemailer email dispatch error (proceeding with DB OTP):", mailError.message || mailError);
         }
 
-        console.log(`[DELIVERY OTP VIA PHONE] Mobile: ${customerMobile || 'N/A'} | OTP: ${otp}`);
+        console.log(`[DELIVERY OTP VIA EMAIL] Email: ${order?.user?.email} | OTP: ${otp}`);
 
         return res.status(200).json({ 
-            message: `OTP sent successfully to phone number ${customerMobile || order?.user?.fullName || 'customer'}`, 
-            mobile: customerMobile,
+            message: `OTP sent successfully to email ${order?.user?.email || order?.user?.fullName || 'customer'}`, 
+            email: order?.user?.email,
             otp 
         })
     } catch (error) {
