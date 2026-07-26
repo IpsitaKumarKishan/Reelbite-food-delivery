@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { FaLocationDot } from "react-icons/fa6";
 import { IoIosSearch } from "react-icons/io";
 import { FiShoppingCart } from "react-icons/fi";
@@ -7,7 +7,7 @@ import { RxCross2 } from "react-icons/rx";
 import axios from 'axios';
 import { serverUrl } from '../App';
 import { setSearchItems, setUserData } from '../redux/userSlice';
-import { FaPlus, FaFilm, FaUtensils } from "react-icons/fa6";
+import { FaPlus, FaFilm, FaUtensils, FaMotorcycle, FaStore } from "react-icons/fa6";
 import { TbReceipt2 } from "react-icons/tb";
 import { useNavigate } from 'react-router-dom';
 
@@ -17,6 +17,7 @@ function Nav() {
     const [showInfo, setShowInfo] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
     const [query, setQuery] = useState("");
+    const dropdownRef = useRef(null);
     const dispatch = useDispatch();
     const navigate = useNavigate();
 
@@ -46,58 +47,71 @@ function Nav() {
         }
     }, [query]);
 
+    // Outside click to close avatar dropdown
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setShowInfo(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
     return (
-        <div className='w-full h-[80px] flex items-center justify-between md:justify-between px-4 lg:px-12 fixed top-0 z-[9999] bg-[#fffcf7]/95 backdrop-blur-md border-b border-amber-900/10 shadow-sm'>
+        <header className='w-full h-[70px] sm:h-[80px] flex items-center justify-between px-3 sm:px-6 lg:px-12 fixed top-0 z-[9999] bg-[#fffcf7]/95 backdrop-blur-md border-b border-amber-900/10 shadow-sm'>
 
             {/* Mobile Search Overlay */}
             {showSearch && userData?.role === "user" && (
-                <div className='w-[90%] h-[70px] bg-white shadow-xl rounded-xl items-center gap-[20px] flex fixed top-[80px] left-[5%] md:hidden z-[9999] border border-amber-500/20 px-3'>
-                    <div className='flex items-center w-[35%] overflow-hidden gap-[6px] border-r border-stone-300 pr-2'>
-                        <FaLocationDot size={18} className="text-[#ea580c]" />
-                        <div className='w-[80%] truncate text-xs font-semibold text-stone-700'>{currentCity}</div>
+                <div className='w-[92%] h-[60px] bg-white shadow-2xl rounded-2xl items-center gap-3 flex fixed top-[75px] left-[4%] md:hidden z-[9999] border border-amber-500/20 px-3 transition-all'>
+                    <div className='flex items-center w-[35%] overflow-hidden gap-1.5 border-r border-stone-200 pr-2 shrink-0'>
+                        <FaLocationDot size={14} className="text-[#ff5200] shrink-0" />
+                        <div className='truncate text-[11px] font-bold text-stone-700'>{currentCity || "Select City"}</div>
                     </div>
-                    <div className='w-[65%] flex items-center gap-[8px]'>
-                        <IoIosSearch size={20} className='text-[#ea580c]' />
+                    <div className='flex-1 flex items-center gap-2'>
+                        <IoIosSearch size={18} className='text-[#ff5200] shrink-0' />
                         <input
                             type="text"
-                            placeholder='search delicious food...'
-                            className='text-xs text-stone-800 outline-none w-full bg-transparent'
+                            placeholder='Search food or dishes...'
+                            className='text-xs font-semibold text-stone-800 outline-none w-full bg-transparent'
                             onChange={(e) => setQuery(e.target.value)}
                             value={query}
+                            autoFocus
                         />
                     </div>
+                    <RxCross2 size={18} className="text-stone-400 cursor-pointer" onClick={() => setShowSearch(false)} />
                 </div>
             )}
 
-            {/* Brand Logo & Reels Button */}
-            <div className='flex items-center gap-6'>
+            {/* Brand Logo & Reels Badge */}
+            <div className='flex items-center gap-2 sm:gap-4 shrink-0'>
                 <h1
-                    className='text-2xl sm:text-3xl font-black text-[#ea580c] cursor-pointer tracking-tight flex items-center gap-1.5'
+                    className='text-xl sm:text-2xl md:text-3xl font-black text-[#ff5200] cursor-pointer tracking-tight flex items-center gap-1.5'
                     onClick={() => navigate("/")}
                 >
-                    <FaUtensils className="text-[#ea580c] text-xl" />
+                    <FaUtensils className="text-[#ff5200] text-lg sm:text-xl" />
                     <span>Reelbite</span>
                 </h1>
 
-                {/* Reels Link Badge */}
+                {/* Reels Link Button */}
                 <button
                     onClick={() => navigate("/reels")}
-                    className="flex items-center gap-1.5 bg-gradient-to-r from-[#ea580c] to-amber-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-md hover:shadow-lg hover:scale-105 transition"
+                    className="flex items-center gap-1 sm:gap-1.5 bg-gradient-to-r from-[#ff5200] to-amber-500 text-white px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-bold shadow hover:scale-105 transition"
                 >
-                    <FaFilm size={12} className="animate-pulse" />
+                    <FaFilm size={11} className="animate-pulse" />
                     <span>Reels</span>
                 </button>
             </div>
 
-            {/* Central Search Bar (Desktop) */}
+            {/* Central Search Bar (Desktop - Customer Only) */}
             {userData?.role === "user" && (
-                <div className='md:w-[45%] lg:w-[38%] h-[50px] bg-stone-100/90 border border-stone-200 shadow-inner rounded-full items-center gap-3 px-4 hidden md:flex focus-within:border-[#ea580c] focus-within:bg-white transition'>
-                    <div className='flex items-center w-[30%] overflow-hidden gap-2 border-r border-stone-300 pr-2'>
-                        <FaLocationDot size={16} className="text-[#ea580c]" />
-                        <div className='truncate text-xs font-bold text-stone-700'>{currentCity}</div>
+                <div className='md:w-[40%] lg:w-[36%] h-[44px] bg-stone-100/90 border border-stone-200 shadow-inner rounded-full items-center gap-2 px-3 hidden md:flex focus-within:border-[#ff5200] focus-within:bg-white transition'>
+                    <div className='flex items-center w-[32%] overflow-hidden gap-1.5 border-r border-stone-300 pr-2 shrink-0'>
+                        <FaLocationDot size={14} className="text-[#ff5200] shrink-0" />
+                        <div className='truncate text-xs font-bold text-stone-700'>{currentCity || "City"}</div>
                     </div>
                     <div className='flex-1 flex items-center gap-2'>
-                        <IoIosSearch size={20} className='text-[#ea580c]' />
+                        <IoIosSearch size={18} className='text-[#ff5200] shrink-0' />
                         <input
                             type="text"
                             placeholder='Search delicious food...'
@@ -110,126 +124,167 @@ function Nav() {
             )}
 
             {/* Right Side Navigation Actions */}
-            <div className='flex items-center gap-4'>
+            <div className='flex items-center gap-2 sm:gap-3 shrink-0'>
+
+                {/* Mobile Search Icon for Customers */}
                 {userData?.role === "user" && (
                     showSearch ? (
-                        <RxCross2 size={22} className='text-[#ea580c] md:hidden cursor-pointer' onClick={() => setShowSearch(false)} />
+                        <button className="p-2 rounded-full hover:bg-stone-100 md:hidden" onClick={() => setShowSearch(false)}>
+                            <RxCross2 size={20} className='text-[#ff5200]' />
+                        </button>
                     ) : (
-                        <IoIosSearch size={22} className='text-[#ea580c] md:hidden cursor-pointer' onClick={() => setShowSearch(true)} />
+                        <button className="p-2 rounded-full hover:bg-stone-100 md:hidden" onClick={() => setShowSearch(true)}>
+                            <IoIosSearch size={20} className='text-[#ff5200]' />
+                        </button>
                     )
                 )}
 
+                {/* Role Specific Quick Action Buttons */}
                 {userData?.role === "owner" ? (
-                    <>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                         <button
-                            className='flex items-center gap-1.5 px-3 py-1.5 cursor-pointer rounded-full bg-[#ea580c]/10 text-[#ea580c] hover:bg-[#ea580c] hover:text-white transition font-bold text-xs'
+                            className='flex items-center gap-1 px-2.5 sm:px-3 py-1.5 cursor-pointer rounded-full bg-[#ff5200]/10 text-[#ff5200] hover:bg-[#ff5200] hover:text-white transition font-bold text-[11px] sm:text-xs'
                             onClick={() => navigate("/owner/reels")}
                         >
-                            <FaFilm size={14} />
+                            <FaFilm size={12} />
                             <span className="hidden sm:inline">Reels Hub</span>
                         </button>
 
-                        {myShopData && (
+                        {myShopData ? (
                             <button
-                                className='flex items-center gap-1 px-3 py-1.5 cursor-pointer rounded-full bg-[#ea580c] text-white hover:bg-[#c2410c] transition font-bold text-xs shadow'
+                                className='flex items-center gap-1 px-2.5 sm:px-3 py-1.5 cursor-pointer rounded-full bg-[#ff5200] text-white hover:bg-[#c2410c] transition font-bold text-[11px] sm:text-xs shadow'
                                 onClick={() => navigate("/add-item")}
                             >
-                                <FaPlus size={14} />
+                                <FaPlus size={11} />
                                 <span className="hidden sm:inline">Add Food</span>
+                            </button>
+                        ) : (
+                            <button
+                                className='flex items-center gap-1 px-2.5 sm:px-3 py-1.5 cursor-pointer rounded-full bg-emerald-700 text-white hover:bg-emerald-800 transition font-bold text-[11px] sm:text-xs shadow'
+                                onClick={() => navigate("/create-edit-shop")}
+                            >
+                                <FaStore size={11} />
+                                <span className="hidden sm:inline">Create Shop</span>
                             </button>
                         )}
 
                         <button
-                            className='flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-full bg-stone-100 text-stone-800 hover:bg-stone-200 transition text-xs font-bold border border-stone-200'
+                            className='flex items-center gap-1.5 cursor-pointer px-2.5 sm:px-3 py-1.5 rounded-full bg-stone-100 text-stone-800 hover:bg-stone-200 transition text-[11px] sm:text-xs font-bold border border-stone-200'
                             onClick={() => navigate("/my-orders")}
                         >
-                            <TbReceipt2 size={16} className="text-[#ea580c]" />
+                            <TbReceipt2 size={15} className="text-[#ff5200]" />
                             <span className="hidden sm:inline">Orders</span>
                         </button>
-                    </>
+                    </div>
+                ) : userData?.role === "deliveryBoy" ? (
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full text-xs font-bold">
+                            <FaMotorcycle size={14} />
+                            <span className="hidden sm:inline">Delivery Partner</span>
+                        </div>
+                    </div>
                 ) : (
-                    <>
+                    <div className="flex items-center gap-2 sm:gap-3">
                         {userData?.role === "user" && (
-                            <div className='relative cursor-pointer p-2 rounded-full hover:bg-stone-100 transition' onClick={() => navigate("/cart")}>
-                                <FiShoppingCart size={22} className='text-stone-800' />
+                            <div className='relative cursor-pointer p-1.5 sm:p-2 rounded-full hover:bg-stone-100 transition' onClick={() => navigate("/cart")}>
+                                <FiShoppingCart size={20} className='text-stone-800' />
                                 {cartItems?.length > 0 && (
-                                    <span className='absolute -top-1 -right-1 bg-[#ea580c] text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm'>
+                                    <span className='absolute -top-1 -right-1 bg-[#ff5200] text-white text-[10px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-white shadow-sm'>
                                         {cartItems.length}
                                     </span>
                                 )}
                             </div>
                         )}
 
-                        <button
-                            className='hidden md:block px-4 py-1.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold border border-stone-200 transition'
-                            onClick={() => navigate("/my-orders")}
-                        >
-                            My Orders
-                        </button>
-                    </>
+                        {userData?.role === "user" && (
+                            <button
+                                className='hidden md:block px-3.5 py-1.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold border border-stone-200 transition'
+                                onClick={() => navigate("/my-orders")}
+                            >
+                                My Orders
+                            </button>
+                        )}
+                    </div>
                 )}
 
-                {/* User Avatar Dropdown */}
+                {/* User Avatar Dropdown (All Logged-in Users) */}
                 {userData ? (
-                    <div className="relative">
+                    <div className="relative" ref={dropdownRef}>
                         <div
-                            className='w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-tr from-[#ea580c] to-amber-500 text-white text-sm shadow-md font-bold cursor-pointer hover:scale-105 transition'
+                            className='w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center bg-gradient-to-tr from-[#ff5200] to-amber-500 text-white text-xs sm:text-sm shadow-md font-extrabold cursor-pointer hover:scale-105 transition'
                             onClick={() => setShowInfo(prev => !prev)}
                         >
                             {userData?.fullName?.slice(0, 1).toUpperCase()}
                         </div>
 
                         {showInfo && (
-                            <div className='absolute top-12 right-0 w-48 bg-white border border-stone-200 shadow-2xl rounded-2xl p-4 flex flex-col gap-3 z-[9999]'>
+                            <div className='absolute top-11 right-0 w-52 bg-white border border-stone-200 shadow-2xl rounded-2xl p-4 flex flex-col gap-2.5 z-[9999] animate-in fade-in slide-in-from-top-2'>
                                 <div className='border-b border-stone-100 pb-2'>
-                                    <div className='text-sm font-bold text-stone-900 truncate'>{userData.fullName}</div>
-                                    <div className='text-[11px] text-stone-500 capitalize'>{userData.role}</div>
+                                    <div className='text-xs sm:text-sm font-extrabold text-stone-900 truncate'>{userData.fullName}</div>
+                                    <div className='text-[10px] font-bold text-[#ff5200] capitalize uppercase tracking-wider mt-0.5'>
+                                        Role: {userData.role}
+                                    </div>
                                 </div>
 
                                 <div
-                                    className='text-xs font-bold text-stone-700 hover:text-[#ea580c] cursor-pointer flex items-center gap-2 py-1'
+                                    className='text-xs font-bold text-stone-700 hover:text-[#ff5200] cursor-pointer flex items-center gap-2 py-1'
                                     onClick={() => { setShowInfo(false); navigate("/reels"); }}
                                 >
-                                    <FaFilm className="text-[#ea580c]" />
+                                    <FaFilm className="text-[#ff5200]" />
                                     <span>Food Reels Feed</span>
                                 </div>
 
                                 {userData.role === "owner" && (
+                                    <>
+                                        <div
+                                            className='text-xs font-bold text-stone-700 hover:text-[#ff5200] cursor-pointer flex items-center gap-2 py-1'
+                                            onClick={() => { setShowInfo(false); navigate("/owner/reels"); }}
+                                        >
+                                            <FaFilm className="text-[#ff5200]" />
+                                            <span>Manage Reels</span>
+                                        </div>
+                                        <div
+                                            className='text-xs font-bold text-stone-700 hover:text-[#ff5200] cursor-pointer flex items-center gap-2 py-1'
+                                            onClick={() => { setShowInfo(false); navigate("/create-edit-shop"); }}
+                                        >
+                                            <FaStore className="text-[#ff5200]" />
+                                            <span>My Restaurant Shop</span>
+                                        </div>
+                                    </>
+                                )}
+
+                                {userData.role === "user" && (
                                     <div
-                                        className='text-xs font-bold text-stone-700 hover:text-[#ea580c] cursor-pointer flex items-center gap-2 py-1'
-                                        onClick={() => { setShowInfo(false); navigate("/owner/reels"); }}
+                                        className='text-xs font-bold text-stone-700 hover:text-[#ff5200] cursor-pointer flex items-center gap-2 py-1'
+                                        onClick={() => { setShowInfo(false); navigate("/my-orders"); }}
                                     >
-                                        <FaFilm className="text-[#ea580c]" />
-                                        <span>Manage Reels</span>
+                                        <TbReceipt2 className="text-[#ff5200]" />
+                                        <span>My Orders</span>
                                     </div>
                                 )}
 
                                 <div
-                                    className='md:hidden text-xs font-bold text-stone-700 hover:text-[#ea580c] cursor-pointer py-1'
-                                    onClick={() => { setShowInfo(false); navigate("/my-orders"); }}
-                                >
-                                    My Orders
-                                </div>
-
-                                <div
-                                    className='text-xs font-bold text-red-600 hover:text-red-700 cursor-pointer pt-2 border-t border-stone-100'
+                                    className='text-xs font-bold text-red-600 hover:text-red-700 cursor-pointer pt-2 border-t border-stone-100 flex items-center justify-between'
                                     onClick={() => { setShowInfo(false); handleLogOut(); }}
                                 >
-                                    Log Out
+                                    <span>Log Out</span>
+                                    <span>➔</span>
                                 </div>
                             </div>
                         )}
                     </div>
                 ) : (
-                    <button
-                        onClick={() => navigate("/signin")}
-                        className="bg-[#ea580c] hover:bg-[#c2410c] text-white px-4 py-1.5 rounded-full text-xs font-bold shadow transition"
-                    >
-                        Sign In
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => navigate("/signin")}
+                            className="bg-[#ff5200] hover:bg-[#c2410c] text-white px-3.5 py-1.5 rounded-full text-xs font-bold shadow transition"
+                        >
+                            Sign In
+                        </button>
+                    </div>
                 )}
             </div>
-        </div>
+        </header>
     );
 }
 

@@ -371,8 +371,6 @@ const Reels = () => {
           <span>Home</span>
         </button>
 
-        <h1 className="text-lg font-black tracking-widest uppercase bg-gradient-to-r from-[#ff5200] via-amber-400 to-red-500 bg-clip-text text-transparent">
-        </h1>
 
         {userData?.role === "owner" ? (
           <button
