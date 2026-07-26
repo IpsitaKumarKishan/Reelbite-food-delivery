@@ -132,7 +132,10 @@ function DeliveryBoy() {
   const handleTodayDeliveries = async () => {
     try {
       const result = await axios.get(`${serverUrl}/api/order/get-today-deliveries`, { withCredentials: true })
-      setTodayDeliveries(result.data)
+      if (result.data) {
+        setTodayDeliveries(result.data.stats || (Array.isArray(result.data) ? result.data : []))
+        setTotalEarning(result.data.totalEarning || 0)
+      }
     } catch (error) {
       console.log(error)
     }

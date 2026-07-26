@@ -565,41 +565,45 @@ export const getTodayDeliveries=async (req,res) => {
            "shopOrders.deliveredAt":{$gte:startsOfDay}
         }).lean()
 
-     let todaysDeliveries=[] 
+        let todaysDeliveries=[] 
      
-     orders.forEach(order=>{
-        order.shopOrders.forEach(shopOrder=>{
-            if(shopOrder.assignedDeliveryBoy==deliveryBoyId &&
-                shopOrder.status=="delivered" &&
-                shopOrder.deliveredAt &&
-                shopOrder.deliveredAt>=startsOfDay
-            ){
-                todaysDeliveries.push(shopOrder)
-            }
+        orders.forEach(order=>{
+           order.shopOrders.forEach(shopOrder=>{
+               if(shopOrder.assignedDeliveryBoy==deliveryBoyId &&
+                   shopOrder.status=="delivered" &&
+                   shopOrder.deliveredAt &&
+                   new Date(shopOrder.deliveredAt)>=startsOfDay
+               ){
+                   todaysDeliveries.push(shopOrder)
+               }
+           })
         })
-     })
 
-let stats={}
+        let stats={}
 
-todaysDeliveries.forEach(shopOrder=>{
-    const hour=new Date(shopOrder.deliveredAt).getHours()
-    stats[hour]=(stats[hour] || 0) + 1
-})
+        todaysDeliveries.forEach(shopOrder=>{
+            const hour=new Date(shopOrder.deliveredAt).getHours()
+            stats[hour]=(stats[hour] || 0) + 1
+        })
 
-let formattedStats=Object.keys(stats).map(hour=>({
- hour:parseInt(hour),
- count:stats[hour]   
-}))
+        let formattedStats=Object.keys(stats).map(hour=>({
+         hour:parseInt(hour),
+         count:stats[hour]   
+        }))
 
-formattedStats.sort((a,b)=>a.hour-b.hour)
+        formattedStats.sort((a,b)=>a.hour-b.hour)
 
-return res.status(200).json(formattedStats)
-  
+        // Delivery earnings: ₹50 flat per completed delivery
+        const totalEarning = todaysDeliveries.length * 50
+
+        return res.status(200).json({
+            stats: formattedStats,
+            totalDeliveriesToday: todaysDeliveries.length,
+            totalEarning
+        })
 
     } catch (error) {
         return res.status(500).json({ message: `today deliveries error ${error}` }) 
     }
-}
-
 
 
