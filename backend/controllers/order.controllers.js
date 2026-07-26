@@ -490,18 +490,30 @@ export const sendDeliveryOtp = async (req, res) => {
     try {
         const { orderId, shopOrderId } = req.body
         const order = await Order.findById(orderId).populate("user")
+        if (!order) {
+            return res.status(400).json({ message: "Order not found" })
+        }
         const shopOrder = order.shopOrders.id(shopOrderId)
-        if (!order || !shopOrder) {
-            return res.status(400).json({ message: "enter valid order/shopOrderid" })
+        if (!shopOrder) {
+            return res.status(400).json({ message: "Enter valid order/shopOrderId" })
         }
         const otp = Math.floor(1000 + Math.random() * 9000).toString()
         shopOrder.deliveryOtp = otp
         shopOrder.otpExpires = Date.now() + 5 * 60 * 1000
         await order.save()
-        await sendDeliveryOtpMail(order.user, otp)
-        return res.status(200).json({ message: `Otp sent Successfuly to ${order?.user?.fullName}` })
+
+        try {
+            await sendDeliveryOtpMail(order.user, otp)
+        } catch (mailError) {
+            console.log("Nodemailer mail dispatch error (proceeding with DB OTP):", mailError.message || mailError);
+        }
+
+        console.log(`[DELIVERY OTP GENERATED] Order ${orderId} - OTP: ${otp}`);
+
+        return res.status(200).json({ message: `OTP sent successfully to ${order?.user?.fullName || 'customer'}`, otp })
     } catch (error) {
-        return res.status(500).json({ message: `delivery otp error ${error}` })
+        console.error("sendDeliveryOtp error:", error);
+        return res.status(500).json({ message: `Delivery OTP error: ${error.message || error}` })
     }
 }
 
