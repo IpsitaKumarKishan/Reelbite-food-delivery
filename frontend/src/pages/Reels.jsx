@@ -372,7 +372,6 @@ const Reels = () => {
         </button>
 
         <h1 className="text-lg font-black tracking-widest uppercase bg-gradient-to-r from-[#ff5200] via-amber-400 to-red-500 bg-clip-text text-transparent">
-          Instagram Food Reels
         </h1>
 
         {userData?.role === "owner" ? (
@@ -392,7 +391,7 @@ const Reels = () => {
       {loading ? (
         <div className="h-screen w-full flex flex-col items-center justify-center text-white bg-black gap-3">
           <div className="w-12 h-12 border-4 border-[#ff5200] border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-stone-400 text-xs font-semibold">Loading IG Food Reels...</p>
+          <p className="text-stone-400 text-xs font-semibold">Loading Reels...</p>
         </div>
       ) : error ? (
         <div className="h-screen w-full flex flex-col items-center justify-center text-stone-300 bg-black gap-4 p-4 text-center">
