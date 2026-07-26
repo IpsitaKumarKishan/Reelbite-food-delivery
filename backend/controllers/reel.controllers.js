@@ -1,5 +1,6 @@
 import Reel from "../models/reel.model.js";
 import Shop from "../models/shop.model.js";
+import Item from "../models/item.model.js";
 import { uploadVideoOnCloudinary } from "../utils/cloudinary.js";
 import fs from "fs";
 
@@ -14,16 +15,47 @@ export const createReel = async (req, res) => {
       return res.status(500).json({ message: "Failed to process video file" });
     }
 
-    const { caption, foodItem } = req.body;
+    const { caption, foodItem, createInlineItem, itemName, itemPrice, itemCategory, itemFoodType, itemImage } = req.body;
     const ownerId = req.userId;
 
     // Find owner shop
     const shop = await Shop.findOne({ owner: ownerId });
 
+    let targetFoodItemId = foodItem;
+
+    // If owner opted to create a new food dish inline while uploading the reel
+    if (createInlineItem === "true" || (itemName && itemPrice)) {
+      if (!itemName || !itemPrice) {
+        return res.status(400).json({ message: "Item name and price are required for new dish creation" });
+      }
+
+      const newItem = new Item({
+        name: itemName,
+        price: Number(itemPrice),
+        category: itemCategory || "Snacks",
+        foodType: itemFoodType || "veg",
+        image: itemImage || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=500&auto=format&fit=crop",
+        shop: shop ? shop._id : null,
+      });
+
+      await newItem.save();
+      targetFoodItemId = newItem._id;
+
+      // Also append to shop's items array if shop exists
+      if (shop && shop.items) {
+        shop.items.push(newItem._id);
+        await shop.save();
+      }
+    }
+
+    if (!targetFoodItemId) {
+      return res.status(400).json({ message: "A linked food item is required for every reel" });
+    }
+
     const newReel = new Reel({
       videoUrl,
       caption: caption || "",
-      foodItem: foodItem || null,
+      foodItem: targetFoodItemId,
       owner: ownerId,
       shop: shop ? shop._id : null,
     });
@@ -57,7 +89,7 @@ export const getAllReels = async (req, res) => {
     const reels = await Reel.find()
       .populate("owner", "fullName email")
       .populate("shop", "name city image")
-      .populate("foodItem", "name price image category foodType rating")
+      .populate("foodItem", "name price image category foodType rating shop")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -132,6 +164,7 @@ export const deleteReel = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized to delete this reel" });
     }
 
+    // Delete ONLY the Reel document. The underlying Item document remains intact in the owner's menu.
     await Reel.findByIdAndDelete(id);
     return res.status(200).json({ message: "Reel deleted successfully" });
   } catch (error) {
