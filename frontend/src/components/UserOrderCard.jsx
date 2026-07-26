@@ -70,9 +70,25 @@ function UserOrderCard({ data }) {
                         ))}
                     </div>
                     <div className='flex justify-between items-center border-t pt-2'>
-                        <p className='font-semibold'>Subtotal: {shopOrder.subtotal}</p>
-                        <span className='text-sm font-medium text-blue-600'>{shopOrder.status}</span>
+                        <p className='font-semibold'>Subtotal: ₹{shopOrder.subtotal}</p>
+                        <span className='text-sm font-medium text-blue-600 capitalize'>{shopOrder.status}</span>
                     </div>
+
+                    {shopOrder.deliveryOtp && shopOrder.status !== "delivered" && (
+                        <div className="mt-2 p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between shadow-sm">
+                            <div>
+                                <p className="text-xs font-bold text-amber-900 flex items-center gap-1">
+                                    <span>🔑 Delivery OTP</span>
+                                </p>
+                                <p className="text-[11px] text-stone-600 mt-0.5">
+                                    Share this code with your delivery partner to collect your order
+                                </p>
+                            </div>
+                            <span className="text-base sm:text-lg font-black text-[#ff5200] bg-white px-3 py-1 rounded-lg border border-amber-200 shadow-sm tracking-widest">
+                                {shopOrder.deliveryOtp}
+                            </span>
+                        </div>
+                    )}
                 </div>
             ))}
 
