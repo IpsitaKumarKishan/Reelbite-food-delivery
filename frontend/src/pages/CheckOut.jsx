@@ -13,7 +13,8 @@ import axios from 'axios';
 import { FaMobileScreenButton } from "react-icons/fa6";
 import { useNavigate } from 'react-router-dom';
 import { serverUrl } from '../App';
-import { addMyOrder, setTotalAmount } from '../redux/userSlice';
+import { addMyOrder, clearCart, setTotalAmount } from '../redux/userSlice';
+
 function RecenterMap({ location }) {
   if (location.lat && location.lon) {
     const map = useMap()
@@ -88,6 +89,7 @@ function CheckOut() {
 
       if(paymentMethod=="cod"){
       dispatch(addMyOrder(result.data))
+      dispatch(clearCart())
       navigate("/order-placed")
       }else{
         const orderId=result.data.orderId
@@ -116,6 +118,7 @@ const openRazorpayWindow=(orderId,razorOrder)=>{
       orderId
     },{withCredentials:true})
         dispatch(addMyOrder(result.data))
+        dispatch(clearCart())
       navigate("/order-placed")
   } catch (error) {
     console.log(error)

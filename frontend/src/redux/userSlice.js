@@ -1,4 +1,25 @@
-import { createSlice, current } from "@reduxjs/toolkit";
+import { createSlice } from "@reduxjs/toolkit";
+
+const loadCartFromStorage = () => {
+  try {
+    const savedCart = localStorage.getItem("cartItems");
+    return savedCart ? JSON.parse(savedCart) : [];
+  } catch (error) {
+    console.error("Failed to load cart from storage:", error);
+    return [];
+  }
+};
+
+const saveCartToStorage = (cartItems) => {
+  try {
+    localStorage.setItem("cartItems", JSON.stringify(cartItems));
+  } catch (error) {
+    console.error("Failed to save cart to storage:", error);
+  }
+};
+
+const initialCartItems = loadCartFromStorage();
+const initialTotalAmount = initialCartItems.reduce((sum, i) => sum + (i.price || 0) * (i.quantity || 0), 0);
 
 const userSlice = createSlice({
   name: "user",
@@ -9,8 +30,8 @@ const userSlice = createSlice({
     currentAddress: null,
     shopInMyCity: null,
     itemsInMyCity: null,
-    cartItems: [],
-    totalAmount: 0,
+    cartItems: initialCartItems,
+    totalAmount: initialTotalAmount,
     myOrders: [],
     searchItems: null,
     socket: null
@@ -47,27 +68,37 @@ const userSlice = createSlice({
       }
 
       state.totalAmount = state.cartItems.reduce((sum, i) => sum + i.price * i.quantity, 0)
-
+      saveCartToStorage(state.cartItems)
     },
 
     setTotalAmount: (state, action) => {
       state.totalAmount = action.payload
-    }
-
-    ,
+    },
 
     updateQuantity: (state, action) => {
       const { id, quantity } = action.payload
-      const item = state.cartItems.find(i => i.id == id)
-      if (item) {
-        item.quantity = quantity
+      if (quantity <= 0) {
+        state.cartItems = state.cartItems.filter(i => i.id != id)
+      } else {
+        const item = state.cartItems.find(i => i.id == id)
+        if (item) {
+          item.quantity = quantity
+        }
       }
       state.totalAmount = state.cartItems.reduce((sum, i) => sum + i.price * i.quantity, 0)
+      saveCartToStorage(state.cartItems)
     },
 
     removeCartItem: (state, action) => {
       state.cartItems = state.cartItems.filter(i => i.id !== action.payload)
       state.totalAmount = state.cartItems.reduce((sum, i) => sum + i.price * i.quantity, 0)
+      saveCartToStorage(state.cartItems)
+    },
+
+    clearCart: (state) => {
+      state.cartItems = []
+      state.totalAmount = 0
+      saveCartToStorage([])
     },
 
     setMyOrders: (state, action) => {
@@ -75,9 +106,8 @@ const userSlice = createSlice({
     },
     addMyOrder: (state, action) => {
       state.myOrders = [action.payload, ...state.myOrders]
-    }
+    },
 
-    ,
     updateOrderStatus: (state, action) => {
       const { orderId, shopId, status } = action.payload
       const order = state.myOrders.find(o => o._id == orderId)
@@ -105,5 +135,5 @@ const userSlice = createSlice({
   }
 })
 
-export const { setUserData, setCurrentAddress, setCurrentCity, setCurrentState, setShopsInMyCity, setItemsInMyCity, addToCart, updateQuantity, removeCartItem, setMyOrders, addMyOrder, updateOrderStatus, setSearchItems, setTotalAmount, setSocket ,updateRealtimeOrderStatus} = userSlice.actions
+export const { setUserData, setCurrentAddress, setCurrentCity, setCurrentState, setShopsInMyCity, setItemsInMyCity, addToCart, updateQuantity, removeCartItem, clearCart, setMyOrders, addMyOrder, updateOrderStatus, setSearchItems, setTotalAmount, setSocket ,updateRealtimeOrderStatus} = userSlice.actions
 export default userSlice.reducer
