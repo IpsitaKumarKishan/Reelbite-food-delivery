@@ -22,8 +22,11 @@ export const createReel = async (req, res) => {
 
     // Find owner shop
     const shop = await Shop.findOne({ owner: ownerId });
+    if (!shop) {
+      return res.status(400).json({ message: "You must create a shop before publishing food reels" });
+    }
 
-    let targetFoodItemId = foodItem;
+    let targetFoodItemId = null;
 
     // Handle uploaded dish image if provided
     let uploadedDishImageUrl = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=500&auto=format&fit=crop";
@@ -50,17 +53,32 @@ export const createReel = async (req, res) => {
         category: itemCategory || "Snacks",
         foodType: itemFoodType || "veg",
         image: uploadedDishImageUrl,
-        shop: shop ? shop._id : null,
+        shop: shop._id,
       });
 
       await newItem.save();
       targetFoodItemId = newItem._id;
 
-      // Also append to shop's items array if shop exists
-      if (shop && shop.items) {
+      // Also append to shop's items array
+      if (shop.items) {
         shop.items.push(newItem._id);
         await shop.save();
       }
+    } else {
+      if (!foodItem) {
+        return res.status(400).json({ message: "A linked food item is required for every reel" });
+      }
+
+      const existingItem = await Item.findById(foodItem);
+      if (!existingItem) {
+        return res.status(404).json({ message: "Selected menu item does not exist" });
+      }
+
+      if (!existingItem.shop || existingItem.shop.toString() !== shop._id.toString()) {
+        return res.status(403).json({ message: "Owners can only link food items that belong to their own shop menu" });
+      }
+
+      targetFoodItemId = existingItem._id;
     }
 
     if (!targetFoodItemId) {

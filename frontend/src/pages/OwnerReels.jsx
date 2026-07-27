@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { serverUrl } from "../App";
 import Nav from "../components/Nav";
+import { setMyShopData } from "../redux/ownerSlice";
 import { FaTrash, FaUpload, FaFilm, FaArrowLeft, FaCheckCircle, FaUtensils, FaImage } from "react-icons/fa";
 
 const OwnerReels = () => {
+  const dispatch = useDispatch();
   const { userData } = useSelector((state) => state.user);
-  const { myShopItems } = useSelector((state) => state.owner || {});
+  const { myShopData } = useSelector((state) => state.owner || {});
+  const myShopItems = myShopData?.items || [];
   const navigate = useNavigate();
 
   const [videoFile, setVideoFile] = useState(null);
@@ -41,7 +44,19 @@ const OwnerReels = () => {
       return;
     }
     fetchMyReels();
+    fetchMyShop();
   }, [userData]);
+
+  const fetchMyShop = async () => {
+    try {
+      const res = await axios.get(`${serverUrl}/api/shop/get-my`, { withCredentials: true });
+      if (res.data) {
+        dispatch(setMyShopData(res.data));
+      }
+    } catch (err) {
+      console.error("Failed to fetch shop data:", err);
+    }
+  };
 
   const fetchMyReels = async () => {
     try {
@@ -143,6 +158,7 @@ const OwnerReels = () => {
       setItemImagePreview(null);
       setIsInlineCreation(false);
       fetchMyReels();
+      fetchMyShop();
     } catch (err) {
       setMessage({
         type: "error",
@@ -304,10 +320,15 @@ const OwnerReels = () => {
                       <option value="">-- Select dish from your menu --</option>
                       {myShopItems?.map((item) => (
                         <option key={item._id} value={item._id}>
-                          {item.name} — ₹{item.price}
+                          {item.name} — ₹{item.price} ({item.category})
                         </option>
                       ))}
                     </select>
+                    {myShopItems.length === 0 && (
+                      <p className="text-[11px] text-amber-400 mt-1.5 font-semibold">
+                        No food items found in your shop menu. Select "+ Add New Dish Inline" or upload items from your dashboard.
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-3 p-4 bg-stone-950 border border-stone-800 rounded-2xl">
