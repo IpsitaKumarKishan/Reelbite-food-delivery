@@ -121,7 +121,27 @@ export const getAllReels = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const reels = await Reel.find()
+    const { city, dietPreference } = req.query;
+
+    const reelQuery = {};
+
+    // 1. Location filter by city (reusing city marketplace logic)
+    if (city && city.trim() !== "") {
+      const matchingShops = await Shop.find({
+        city: { $regex: new RegExp(`^${city.trim()}$`, "i") }
+      }).select("_id");
+      const shopIds = matchingShops.map((s) => s._id);
+      reelQuery.shop = { $in: shopIds };
+    }
+
+    // 2. Conditional diet filter (veg only vs all)
+    if (dietPreference === "veg") {
+      const matchingVegItems = await Item.find({ foodType: "veg" }).select("_id");
+      const itemIds = matchingVegItems.map((i) => i._id);
+      reelQuery.foodItem = { $in: itemIds };
+    }
+
+    const reels = await Reel.find(reelQuery)
       .populate("owner", "fullName email")
       .populate("shop", "name city image")
       .populate("foodItem", "name price image category foodType rating shop")
@@ -129,12 +149,12 @@ export const getAllReels = async (req, res) => {
       .skip(skip)
       .limit(limit);
 
-    const total = await Reel.countDocuments();
+    const total = await Reel.countDocuments(reelQuery);
 
     return res.status(200).json({
       reels,
       currentPage: page,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / limit) || 1,
       totalReels: total,
     });
   } catch (error) {

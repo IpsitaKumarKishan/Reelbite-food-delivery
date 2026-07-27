@@ -6,7 +6,8 @@ import {
   addToCartBackend,
   updateCartQuantityBackend,
   removeCartItemBackend,
-  clearCartBackend
+  clearCartBackend,
+  updateDietPreference
 } from "../controllers/user.controllers.js"
 import isAuth from "../middlewares/isAuth.js"
 
@@ -14,6 +15,7 @@ const userRouter = express.Router()
 
 userRouter.get("/current", isAuth, getCurrentUser)
 userRouter.post('/update-location', isAuth, updateUserLocation)
+userRouter.put('/diet-preference', isAuth, updateDietPreference)
 
 // Cart endpoints
 userRouter.get('/cart', isAuth, getCart)

@@ -50,7 +50,12 @@ coordinates:{type:[Number],default:[0,0]}
        item: { type: mongoose.Schema.Types.ObjectId, ref: "Item", required: true },
        quantity: { type: Number, default: 1, min: 1 }
      }
-   ]
+   ],
+   dietPreference: {
+     type: String,
+     enum: ["veg", "all"],
+     default: "all"
+   }
   
 }, { timestamps: true })
 

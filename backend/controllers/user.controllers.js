@@ -140,3 +140,29 @@ export const clearCartBackend = async (req, res) => {
   }
 }
 
+export const updateDietPreference = async (req, res) => {
+  try {
+    const { dietPreference } = req.body
+    if (!["veg", "all"].includes(dietPreference)) {
+      return res.status(400).json({ message: "Invalid dietPreference. Must be 'veg' or 'all'" })
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { dietPreference },
+      { new: true }
+    ).populate("cart.item")
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" })
+    }
+
+    const userObj = user.toObject()
+    userObj.cart = formatUserCart(user.cart)
+
+    return res.status(200).json(userObj)
+  } catch (error) {
+    return res.status(500).json({ message: `Update diet preference error ${error}` })
+  }
+}
+

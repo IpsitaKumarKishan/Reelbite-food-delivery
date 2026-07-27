@@ -6,7 +6,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RxCross2 } from "react-icons/rx";
 import axios from 'axios';
 import { serverUrl } from '../App';
-import { setSearchItems, setUserData } from '../redux/userSlice';
+import { setSearchItems, setUserData, updateUserDietPreference } from '../redux/userSlice';
 import { FaPlus, FaFilm, FaUtensils, FaMotorcycle, FaStore } from "react-icons/fa6";
 import { TbReceipt2 } from "react-icons/tb";
 import { useNavigate } from 'react-router-dom';
@@ -262,6 +262,44 @@ function Nav() {
                                         <span>My Orders</span>
                                     </div>
                                 )}
+
+                                <div className='border-t border-stone-100 pt-2 space-y-1'>
+                                    <div className='text-[10px] font-bold text-stone-500 uppercase tracking-wider'>Reel Feed Diet</div>
+                                    <div className='grid grid-cols-2 gap-1 text-[11px] font-bold'>
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                try {
+                                                    await axios.put(`${serverUrl}/api/user/diet-preference`, { dietPreference: "all" }, { withCredentials: true });
+                                                    dispatch(updateUserDietPreference("all"));
+                                                } catch (e) {}
+                                            }}
+                                            className={`py-1 px-1.5 rounded-lg border transition ${
+                                                (userData?.dietPreference || "all") === "all"
+                                                    ? "bg-[#ff5200] text-white border-[#ff5200]"
+                                                    : "bg-stone-50 text-stone-600 border-stone-200"
+                                            }`}
+                                        >
+                                            Show All 🍕
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                try {
+                                                    await axios.put(`${serverUrl}/api/user/diet-preference`, { dietPreference: "veg" }, { withCredentials: true });
+                                                    dispatch(updateUserDietPreference("veg"));
+                                                } catch (e) {}
+                                            }}
+                                            className={`py-1 px-1.5 rounded-lg border transition ${
+                                                userData?.dietPreference === "veg"
+                                                    ? "bg-emerald-600 text-white border-emerald-600"
+                                                    : "bg-stone-50 text-stone-600 border-stone-200"
+                                            }`}
+                                        >
+                                            Veg Only 🌱
+                                        </button>
+                                    </div>
+                                </div>
 
                                 <div
                                     className='text-xs font-bold text-red-600 hover:text-red-700 cursor-pointer pt-2 border-t border-stone-100 flex items-center justify-between'
