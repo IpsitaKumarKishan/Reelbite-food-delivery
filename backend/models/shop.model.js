@@ -29,7 +29,11 @@ const shopSchema=new mongoose.Schema({
     items:[{
         type:mongoose.Schema.Types.ObjectId,
         ref:"Item"
-    }]
+    }],
+    commissionRate:{
+        type:Number,
+        default:20
+    }
 
 },{timestamps:true})
 

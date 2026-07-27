@@ -47,7 +47,11 @@ otpExpires:{
 deliveredAt:{
     type:Date,
     default:null
-}
+},
+commissionRate: { type: Number, default: 20 },
+commissionAmount: { type: Number, default: 0 },
+restaurantPayout: { type: Number, default: 0 },
+settlementStatus: { type: String, enum: ["unsettled", "settled"], default: "unsettled" }
 
 }, { timestamps: true })
 
@@ -68,8 +72,15 @@ const orderSchema = new mongoose.Schema({
     },
     totalAmount: {
         type: Number
-    }
-    ,
+    },
+    subtotal: { type: Number, default: 0 },
+    deliveryFee: { type: Number, default: 0 },
+    platformFee: { type: Number, default: 0 },
+    commissionAmount: { type: Number, default: 0 },
+    restaurantPayout: { type: Number, default: 0 },
+    deliveryPartnerPayout: { type: Number, default: 0 },
+    platformRevenue: { type: Number, default: 0 },
+    settlementStatus: { type: String, enum: ["unsettled", "settled"], default: "unsettled" },
     shopOrders: [shopOrderSchema],
     payment:{
         type:Boolean,

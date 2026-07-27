@@ -6,6 +6,7 @@ import { sendDeliveryOtpMail } from "../utils/mail.js"
 import RazorPay from "razorpay"
 import dotenv from "dotenv"
 import { count } from "console"
+import { computeOrderSplit } from "../utils/orderSplit.js"
 
 dotenv.config()
 let instance = new RazorPay({
@@ -33,17 +34,27 @@ export const placeOrder = async (req, res) => {
             groupItemsByShop[shopId].push(item)
         });
 
+        const shopCommissionRates = {}
         const shopOrders = await Promise.all(Object.keys(groupItemsByShop).map(async (shopId) => {
             const shop = await Shop.findById(shopId).populate("owner")
             if (!shop) {
                 return res.status(400).json({ message: "shop not found" })
             }
+            shopCommissionRates[shop._id.toString()] = shop.commissionRate || 20;
             const items = groupItemsByShop[shopId]
             const subtotal = items.reduce((sum, i) => sum + Number(i.price) * Number(i.quantity), 0)
+            const rate = shop.commissionRate || 20;
+            const commissionAmount = Math.round((subtotal * (rate / 100)) * 100) / 100;
+            const restaurantPayout = Math.round((subtotal - commissionAmount) * 100) / 100;
+
             return {
                 shop: shop._id,
                 owner: shop.owner._id,
                 subtotal,
+                commissionRate: rate,
+                commissionAmount,
+                restaurantPayout,
+                settlementStatus: "unsettled",
                 shopOrderItems: items.map((i) => ({
                     item: i.id,
                     price: i.price,
@@ -53,6 +64,8 @@ export const placeOrder = async (req, res) => {
             }
         }
         ))
+
+        const calculatedSplit = computeOrderSplit({ shopOrders }, shopCommissionRates);
 
         if (paymentMethod == "online") {
             const razorOrder = await instance.orders.create({
@@ -65,7 +78,15 @@ export const placeOrder = async (req, res) => {
                 paymentMethod,
                 deliveryAddress,
                 totalAmount,
-                shopOrders,
+                subtotal: calculatedSplit.subtotal,
+                deliveryFee: calculatedSplit.deliveryFee,
+                platformFee: calculatedSplit.platformFee,
+                commissionAmount: calculatedSplit.commissionAmount,
+                restaurantPayout: calculatedSplit.restaurantPayout,
+                deliveryPartnerPayout: calculatedSplit.deliveryPartnerPayout,
+                platformRevenue: calculatedSplit.platformRevenue,
+                settlementStatus: "unsettled",
+                shopOrders: calculatedSplit.shopOrders,
                 razorpayOrderId: razorOrder.id,
                 payment: false
             })
@@ -82,7 +103,15 @@ export const placeOrder = async (req, res) => {
             paymentMethod,
             deliveryAddress,
             totalAmount,
-            shopOrders
+            subtotal: calculatedSplit.subtotal,
+            deliveryFee: calculatedSplit.deliveryFee,
+            platformFee: calculatedSplit.platformFee,
+            commissionAmount: calculatedSplit.commissionAmount,
+            restaurantPayout: calculatedSplit.restaurantPayout,
+            deliveryPartnerPayout: calculatedSplit.deliveryPartnerPayout,
+            platformRevenue: calculatedSplit.platformRevenue,
+            settlementStatus: "unsettled",
+            shopOrders: calculatedSplit.shopOrders
         })
 
         await newOrder.populate("shopOrders.shopOrderItems.item", "name image price")
@@ -109,8 +138,6 @@ export const placeOrder = async (req, res) => {
             });
         }
 
-
-
         await User.findByIdAndUpdate(req.userId, { cart: [] });
 
         return res.status(201).json(newOrder)
@@ -131,8 +158,20 @@ export const verifyPayment = async (req, res) => {
             return res.status(400).json({ message: "order not found" })
         }
 
+        const calculatedSplit = computeOrderSplit(order);
+
         order.payment = true
         order.razorpayPaymentId = razorpay_payment_id
+        order.subtotal = calculatedSplit.subtotal;
+        order.deliveryFee = calculatedSplit.deliveryFee;
+        order.platformFee = calculatedSplit.platformFee;
+        order.commissionAmount = calculatedSplit.commissionAmount;
+        order.restaurantPayout = calculatedSplit.restaurantPayout;
+        order.deliveryPartnerPayout = calculatedSplit.deliveryPartnerPayout;
+        order.platformRevenue = calculatedSplit.platformRevenue;
+        order.settlementStatus = calculatedSplit.settlementStatus;
+        order.shopOrders = calculatedSplit.shopOrders;
+
         await order.save()
         await User.findByIdAndUpdate(req.userId, { cart: [] });
 

@@ -105,31 +105,37 @@ function CheckOut() {
 const openRazorpayWindow=(orderId,razorOrder)=>{
 
   const options={
- key:import.meta.env.VITE_RAZORPAY_KEY_ID,
- amount:razorOrder.amount,
- currency:'INR',
- name:"Reelbite",
- description:"Food Delivery Website",
- order_id:razorOrder.id,
- handler:async function (response) {
-  try {
-    const result=await axios.post(`${serverUrl}/api/order/verify-payment`,{
-      razorpay_payment_id:response.razorpay_payment_id,
-      orderId
-    },{withCredentials:true})
+    key:import.meta.env.VITE_RAZORPAY_KEY_ID,
+    amount:razorOrder.amount,
+    currency:'INR',
+    name:"Reelbite",
+    description:"Food Delivery Website",
+    order_id:razorOrder.id,
+    prefill: {
+      name: userData?.fullName || "Customer",
+      email: userData?.email || "customer@example.com",
+      contact: userData?.mobile || "9876543210"
+    },
+    theme: {
+      color: "#ff4d2d"
+    },
+    handler:async function (response) {
+      try {
+        const result=await axios.post(`${serverUrl}/api/order/verify-payment`,{
+          razorpay_payment_id:response.razorpay_payment_id,
+          orderId
+        },{withCredentials:true})
         dispatch(addMyOrder(result.data))
         dispatch(clearCart())
-      navigate("/order-placed")
-  } catch (error) {
-    console.log(error)
-  }
- }
+        navigate("/order-placed")
+      } catch (error) {
+        console.log(error)
+      }
+    }
   }
 
   const rzp=new window.Razorpay(options)
   rzp.open()
-
-
 }
 
 
@@ -216,15 +222,19 @@ const openRazorpayWindow=(orderId,razorOrder)=>{
  <hr className='border-gray-200 my-2'/>
 <div className='flex justify-between font-medium text-gray-800'>
   <span>Subtotal</span>
-  <span>{totalAmount}</span>
+  <span>₹{totalAmount}</span>
 </div>
-<div className='flex justify-between text-gray-700'>
+<div className='flex justify-between text-gray-700 text-sm'>
   <span>Delivery Fee</span>
-  <span>{deliveryFee==0?"Free":deliveryFee}</span>
+  <span>{deliveryFee==0?"Free":`₹${deliveryFee}`}</span>
 </div>
-<div className='flex justify-between text-lg font-bold text-[#ff4d2d] pt-2'>
-    <span>Total</span>
-  <span>{AmountWithDeliveryFee}</span>
+<div className='flex justify-between text-gray-700 text-sm'>
+  <span>Platform Fee</span>
+  <span className='text-green-600 font-semibold'>₹0 (Free)</span>
+</div>
+<div className='flex justify-between text-lg font-bold text-[#ff4d2d] pt-2 border-t border-gray-200'>
+    <span>Total Amount</span>
+  <span>₹{AmountWithDeliveryFee}</span>
 </div>
 </div>
         </section>
