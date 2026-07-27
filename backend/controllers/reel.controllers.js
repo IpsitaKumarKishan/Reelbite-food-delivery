@@ -115,6 +115,9 @@ export const createReel = async (req, res) => {
   }
 };
 
+import jwt from "jsonwebtoken";
+import ReelInteraction from "../models/reelInteraction.model.js";
+
 export const getAllReels = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -123,9 +126,18 @@ export const getAllReels = async (req, res) => {
 
     const { city, dietPreference } = req.query;
 
+    // Identify user if token is provided in cookies or auth header
+    let userId = req.userId;
+    if (!userId && req.cookies?.token) {
+      try {
+        const decoded = jwt.verify(req.cookies.token, process.env.JWT_SECRET);
+        userId = decoded.userId;
+      } catch (e) {}
+    }
+
     const reelQuery = {};
 
-    // 1. Location filter by city (reusing city marketplace logic)
+    // 1. HARD FILTER: Location filter by city (reusing city marketplace logic)
     if (city && city.trim() !== "") {
       const matchingShops = await Shop.find({
         city: { $regex: new RegExp(`^${city.trim()}$`, "i") }
@@ -134,25 +146,129 @@ export const getAllReels = async (req, res) => {
       reelQuery.shop = { $in: shopIds };
     }
 
-    // 2. Conditional diet filter (veg only vs all)
+    // 2. HARD FILTER: Conditional diet filter (veg only vs all)
     if (dietPreference === "veg") {
       const matchingVegItems = await Item.find({ foodType: "veg" }).select("_id");
       const itemIds = matchingVegItems.map((i) => i._id);
       reelQuery.foodItem = { $in: itemIds };
     }
 
-    const reels = await Reel.find(reelQuery)
+    // Fetch candidate pool passing hard location & diet filters
+    const candidateReels = await Reel.find(reelQuery)
       .populate("owner", "fullName email")
       .populate("shop", "name city image")
-      .populate("foodItem", "name price image category foodType rating shop")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+      .populate("foodItem", "name price image category foodType rating shop");
 
-    const total = await Reel.countDocuments(reelQuery);
+    // 3. AFFINITY SCORE: Compute user interest profile from recent interaction history
+    const categoryAffinity = {};
+    const shopAffinity = {};
+    let hasSufficientHistory = false;
+
+    if (userId) {
+      const recentInteractions = await ReelInteraction.find({ user: userId })
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .populate({
+          path: "reel",
+          select: "foodItem shop",
+          populate: [
+            { path: "foodItem", select: "category" },
+            { path: "shop", select: "_id" }
+          ]
+        });
+
+      if (recentInteractions && recentInteractions.length >= 2) {
+        hasSufficientHistory = true;
+        recentInteractions.forEach((inter) => {
+          const category = inter.reel?.foodItem?.category;
+          const shopIdStr = inter.reel?.shop?._id?.toString() || inter.reel?.shop?.toString();
+
+          let weight = 1;
+          if (inter.addedToCart) weight = 10;
+          else if (inter.liked || inter.shared) weight = 5;
+          else if (inter.watchPercentage > 70) weight = 3;
+          else if (inter.skipped || inter.watchPercentage < 15) weight = -3;
+
+          if (category) {
+            categoryAffinity[category] = (categoryAffinity[category] || 0) + weight;
+          }
+          if (shopIdStr) {
+            shopAffinity[shopIdStr] = (shopAffinity[shopIdStr] || 0) + weight;
+          }
+        });
+      }
+    }
+
+    // 4. COMPOSITE SCORING (Affinity + Popularity + Recency)
+    const now = Date.now();
+    const scoredReels = candidateReels.map((reel) => {
+      const category = reel.foodItem?.category;
+      const shopIdStr = reel.shop?._id?.toString();
+
+      const catScore = category ? (categoryAffinity[category] || 0) : 0;
+      const shpScore = shopIdStr ? (shopAffinity[shopIdStr] || 0) : 0;
+      const affinityScore = catScore * 1.5 + shpScore * 1.0;
+
+      const likesCount = reel.likes?.length || 0;
+      const viewsCount = reel.views || 0;
+      const popularityScore = likesCount * 3 + viewsCount * 0.5;
+
+      const hoursOld = (now - new Date(reel.createdAt).getTime()) / (1000 * 60 * 60);
+      const recencyBoost = Math.max(0, 50 - hoursOld * 0.5);
+
+      let finalScore = 0;
+      if (hasSufficientHistory) {
+        finalScore = affinityScore * 4 + popularityScore * 1.5 + recencyBoost;
+      } else {
+        // Cold-Start Fallback: Popularity + Recency
+        finalScore = popularityScore * 3 + recencyBoost;
+      }
+
+      return { reel, finalScore, category };
+    });
+
+    // Sort candidate reels by final score descending
+    scoredReels.sort((a, b) => b.finalScore - a.finalScore);
+
+    // 5. EXPLORATION INJECTION (~15–20% slots reserved for exploration)
+    let orderedReels = scoredReels.map((item) => item.reel);
+
+    if (hasSufficientHistory && scoredReels.length > 3) {
+      const topCategories = Object.keys(categoryAffinity).sort(
+        (a, b) => categoryAffinity[b] - categoryAffinity[a]
+      );
+      const topCat = topCategories[0];
+
+      if (topCat) {
+        const topCategoryItems = scoredReels.filter((item) => item.category === topCat);
+        const explorationItems = scoredReels.filter((item) => item.category !== topCat);
+
+        if (explorationItems.length > 0 && topCategoryItems.length > 0) {
+          const combined = [];
+          let topIdx = 0;
+          let expIdx = 0;
+
+          for (let i = 0; i < scoredReels.length; i++) {
+            // Insert 1 exploration reel every 5 positions (20%)
+            if ((i + 1) % 5 === 0 && expIdx < explorationItems.length) {
+              combined.push(explorationItems[expIdx++].reel);
+            } else if (topIdx < topCategoryItems.length) {
+              combined.push(topCategoryItems[topIdx++].reel);
+            } else if (expIdx < explorationItems.length) {
+              combined.push(explorationItems[expIdx++].reel);
+            }
+          }
+          orderedReels = combined;
+        }
+      }
+    }
+
+    // 6. PAGINATE & RETURN
+    const total = orderedReels.length;
+    const paginatedReels = orderedReels.slice(skip, skip + limit);
 
     return res.status(200).json({
-      reels,
+      reels: paginatedReels,
       currentPage: page,
       totalPages: Math.ceil(total / limit) || 1,
       totalReels: total,

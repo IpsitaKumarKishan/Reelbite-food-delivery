@@ -10,6 +10,8 @@ import {
   deleteReel,
 } from "../controllers/reel.controllers.js";
 
+import { logReelInteraction } from "../controllers/reelInteraction.controllers.js";
+
 const reelRouter = express.Router();
 
 // Public / Authenticated read routes
@@ -28,6 +30,7 @@ reelRouter.post(
   createReel
 );
 reelRouter.patch("/:id/like", isAuth, toggleLikeReel);
+reelRouter.post("/:id/interaction", isAuth, logReelInteraction);
 reelRouter.delete("/:id", isAuth, isOwner, deleteReel);
 
 export default reelRouter;

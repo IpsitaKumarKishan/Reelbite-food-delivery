@@ -32,6 +32,35 @@ const ReelCard = ({ reel, currentUser }) => {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [addedToast, setAddedToast] = useState(false);
 
+  const startTimeRef = useRef(null);
+  const totalWatchTimeRef = useRef(0);
+  const hasLoggedRef = useRef(false);
+
+  const sendInteractionLog = (extraFlags = {}) => {
+    if (!currentUser) return;
+    const videoElement = videoRef.current;
+    const durationSec = videoElement?.duration || 15;
+    const watchMs = totalWatchTimeRef.current;
+    if (watchMs < 800 && !extraFlags.liked && !extraFlags.addedToCart && !extraFlags.shared) {
+      return;
+    }
+    const watchPercentage = Math.min(100, Math.round((watchMs / (durationSec * 1000)) * 100));
+    const isSkipped = watchPercentage < 15 && !extraFlags.liked && !extraFlags.addedToCart && !extraFlags.shared;
+
+    axios.post(
+      `${serverUrl}/api/reels/${reel._id}/interaction`,
+      {
+        watchDurationMs: watchMs,
+        watchPercentage,
+        liked: extraFlags.liked !== undefined ? extraFlags.liked : isLiked,
+        shared: extraFlags.shared || false,
+        addedToCart: extraFlags.addedToCart || false,
+        skipped: isSkipped
+      },
+      { withCredentials: true }
+    ).catch(() => {});
+  };
+
   useEffect(() => {
     const videoElement = videoRef.current;
     if (!videoElement) return;
@@ -40,13 +69,23 @@ const ReelCard = ({ reel, currentUser }) => {
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
+            startTimeRef.current = Date.now();
+            hasLoggedRef.current = false;
             videoElement
               .play()
               .then(() => setIsPlaying(true))
               .catch(() => setIsPlaying(false));
           } else {
+            if (startTimeRef.current) {
+              totalWatchTimeRef.current += Date.now() - startTimeRef.current;
+              startTimeRef.current = null;
+            }
             videoElement.pause();
             setIsPlaying(false);
+            if (!hasLoggedRef.current) {
+              sendInteractionLog();
+              hasLoggedRef.current = true;
+            }
           }
         });
       },
@@ -57,8 +96,14 @@ const ReelCard = ({ reel, currentUser }) => {
 
     return () => {
       observer.unobserve(videoElement);
+      if (startTimeRef.current) {
+        totalWatchTimeRef.current += Date.now() - startTimeRef.current;
+      }
+      if (!hasLoggedRef.current) {
+        sendInteractionLog();
+      }
     };
-  }, []);
+  }, [reel._id, currentUser]);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -78,6 +123,11 @@ const ReelCard = ({ reel, currentUser }) => {
       navigate("/signin");
       return;
     }
+    const newLikedState = !isLiked;
+    setIsLiked(newLikedState);
+    setLikesCount(prev => newLikedState ? prev + 1 : prev - 1);
+    sendInteractionLog({ liked: newLikedState });
+
     try {
       const res = await axios.patch(
         `${serverUrl}/api/reels/${reel._id}/like`,
@@ -97,6 +147,7 @@ const ReelCard = ({ reel, currentUser }) => {
       navigate("/signin");
       return;
     }
+    sendInteractionLog({ addedToCart: true });
     if (reel.foodItem) {
       try {
         const res = await axios.post(`${serverUrl}/api/user/cart/add`, {
