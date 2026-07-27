@@ -99,7 +99,7 @@ const ReelCard = ({ reel, currentUser }) => {
     }
   };
 
-  const handleAddToCart = (e) => {
+  const handleAddToCart = async (e) => {
     e.stopPropagation();
     if (!reel.foodItem) return;
     dispatch(
@@ -114,6 +114,17 @@ const ReelCard = ({ reel, currentUser }) => {
     );
     setAddedToast(true);
     setTimeout(() => setAddedToast(false), 2200);
+
+    try {
+      const res = await axios.post(
+        `${serverUrl}/api/user/cart/add`,
+        { itemId: reel.foodItem._id, quantity: 1 },
+        { withCredentials: true }
+      );
+      if (res.data) dispatch(setCartItems(res.data));
+    } catch (err) {
+      console.error("Cart add error from reel:", err);
+    }
   };
 
   const handleShare = (e) => {

@@ -111,6 +111,8 @@ export const placeOrder = async (req, res) => {
 
 
 
+        await User.findByIdAndUpdate(req.userId, { cart: [] });
+
         return res.status(201).json(newOrder)
     } catch (error) {
         return res.status(500).json({ message: `place order error ${error}` })
@@ -132,6 +134,7 @@ export const verifyPayment = async (req, res) => {
         order.payment = true
         order.razorpayPaymentId = razorpay_payment_id
         await order.save()
+        await User.findByIdAndUpdate(req.userId, { cart: [] });
 
         await order.populate("shopOrders.shopOrderItems.item", "name image price")
         await order.populate("shopOrders.shop", "name")
@@ -606,4 +609,4 @@ export const getTodayDeliveries=async (req,res) => {
         return res.status(500).json({ message: `today deliveries error ${error}` }) 
     }
 
-
+}

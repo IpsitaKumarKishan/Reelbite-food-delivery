@@ -16,7 +16,7 @@ import {
 } from "react-icons/fa6";
 import { FaSearch, FaShoppingBag } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
-import { addToCart, updateQuantity } from "../redux/userSlice";
+import { addToCart, setCartItems, updateQuantity } from "../redux/userSlice";
 import Nav from "../components/Nav";
 import MobileBottomTab from "../components/MobileBottomTab";
 
@@ -26,7 +26,7 @@ const SwiggyDishItem = ({ item, shopId }) => {
   const cartItem = cartItems.find((i) => i.id === item._id);
   const quantityInCart = cartItem ? cartItem.quantity : 0;
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     dispatch(
       addToCart({
         id: item._id,
@@ -38,18 +38,44 @@ const SwiggyDishItem = ({ item, shopId }) => {
         foodType: item.foodType,
       })
     );
+    try {
+      const res = await axios.post(
+        `${serverUrl}/api/user/cart/add`,
+        { itemId: item._id, quantity: 1 },
+        { withCredentials: true }
+      );
+      if (res.data) dispatch(setCartItems(res.data));
+    } catch (err) {
+      console.error("Cart add error:", err);
+    }
   };
 
-  const handleIncrement = () => {
+  const handleIncrement = async () => {
     dispatch(updateQuantity({ id: item._id, quantity: quantityInCart + 1 }));
+    try {
+      const res = await axios.put(
+        `${serverUrl}/api/user/cart/update`,
+        { itemId: item._id, quantity: quantityInCart + 1 },
+        { withCredentials: true }
+      );
+      if (res.data) dispatch(setCartItems(res.data));
+    } catch (err) {
+      console.error("Cart update error:", err);
+    }
   };
 
-  const handleDecrement = () => {
-    if (quantityInCart > 1) {
-      dispatch(updateQuantity({ id: item._id, quantity: quantityInCart - 1 }));
-    } else {
-      // Remove item
-      dispatch(updateQuantity({ id: item._id, quantity: 0 }));
+  const handleDecrement = async () => {
+    const newQty = quantityInCart - 1;
+    dispatch(updateQuantity({ id: item._id, quantity: newQty }));
+    try {
+      const res = await axios.put(
+        `${serverUrl}/api/user/cart/update`,
+        { itemId: item._id, quantity: newQty },
+        { withCredentials: true }
+      );
+      if (res.data) dispatch(setCartItems(res.data));
+    } catch (err) {
+      console.error("Cart update error:", err);
     }
   };
 

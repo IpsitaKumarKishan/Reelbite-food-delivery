@@ -1,26 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
 
-const loadCartFromStorage = () => {
-  try {
-    const savedCart = localStorage.getItem("cartItems");
-    return savedCart ? JSON.parse(savedCart) : [];
-  } catch (error) {
-    console.error("Failed to load cart from storage:", error);
-    return [];
-  }
-};
-
-const saveCartToStorage = (cartItems) => {
-  try {
-    localStorage.setItem("cartItems", JSON.stringify(cartItems));
-  } catch (error) {
-    console.error("Failed to save cart to storage:", error);
-  }
-};
-
-const initialCartItems = loadCartFromStorage();
-const initialTotalAmount = initialCartItems.reduce((sum, i) => sum + (i.price || 0) * (i.quantity || 0), 0);
-
 const userSlice = createSlice({
   name: "user",
   initialState: {
@@ -30,8 +9,8 @@ const userSlice = createSlice({
     currentAddress: null,
     shopInMyCity: null,
     itemsInMyCity: null,
-    cartItems: initialCartItems,
-    totalAmount: initialTotalAmount,
+    cartItems: [],
+    totalAmount: 0,
     myOrders: [],
     searchItems: null,
     socket: null
@@ -58,17 +37,23 @@ const userSlice = createSlice({
     setSocket: (state, action) => {
       state.socket = action.payload
     },
+    setCartItems: (state, action) => {
+      state.cartItems = action.payload || []
+      state.totalAmount = (action.payload || []).reduce((sum, i) => sum + (i.price || 0) * (i.quantity || 0), 0)
+    },
     addToCart: (state, action) => {
-      const cartItem = action.payload
-      const existingItem = state.cartItems.find(i => i.id == cartItem.id)
-      if (existingItem) {
-        existingItem.quantity += cartItem.quantity
+      if (Array.isArray(action.payload)) {
+        state.cartItems = action.payload
       } else {
-        state.cartItems.push(cartItem)
+        const cartItem = action.payload
+        const existingItem = state.cartItems.find(i => i.id == cartItem.id)
+        if (existingItem) {
+          existingItem.quantity += cartItem.quantity
+        } else {
+          state.cartItems.push(cartItem)
+        }
       }
-
       state.totalAmount = state.cartItems.reduce((sum, i) => sum + i.price * i.quantity, 0)
-      saveCartToStorage(state.cartItems)
     },
 
     setTotalAmount: (state, action) => {
@@ -76,29 +61,34 @@ const userSlice = createSlice({
     },
 
     updateQuantity: (state, action) => {
-      const { id, quantity } = action.payload
-      if (quantity <= 0) {
-        state.cartItems = state.cartItems.filter(i => i.id != id)
+      if (Array.isArray(action.payload)) {
+        state.cartItems = action.payload
       } else {
-        const item = state.cartItems.find(i => i.id == id)
-        if (item) {
-          item.quantity = quantity
+        const { id, quantity } = action.payload
+        if (quantity <= 0) {
+          state.cartItems = state.cartItems.filter(i => i.id != id)
+        } else {
+          const item = state.cartItems.find(i => i.id == id)
+          if (item) {
+            item.quantity = quantity
+          }
         }
       }
       state.totalAmount = state.cartItems.reduce((sum, i) => sum + i.price * i.quantity, 0)
-      saveCartToStorage(state.cartItems)
     },
 
     removeCartItem: (state, action) => {
-      state.cartItems = state.cartItems.filter(i => i.id !== action.payload)
+      if (Array.isArray(action.payload)) {
+        state.cartItems = action.payload
+      } else {
+        state.cartItems = state.cartItems.filter(i => i.id !== action.payload)
+      }
       state.totalAmount = state.cartItems.reduce((sum, i) => sum + i.price * i.quantity, 0)
-      saveCartToStorage(state.cartItems)
     },
 
     clearCart: (state) => {
       state.cartItems = []
       state.totalAmount = 0
-      saveCartToStorage([])
     },
 
     setMyOrders: (state, action) => {
@@ -135,5 +125,5 @@ const userSlice = createSlice({
   }
 })
 
-export const { setUserData, setCurrentAddress, setCurrentCity, setCurrentState, setShopsInMyCity, setItemsInMyCity, addToCart, updateQuantity, removeCartItem, clearCart, setMyOrders, addMyOrder, updateOrderStatus, setSearchItems, setTotalAmount, setSocket ,updateRealtimeOrderStatus} = userSlice.actions
+export const { setUserData, setCurrentAddress, setCurrentCity, setCurrentState, setShopsInMyCity, setItemsInMyCity, setCartItems, addToCart, updateQuantity, removeCartItem, clearCart, setMyOrders, addMyOrder, updateOrderStatus, setSearchItems, setTotalAmount, setSocket ,updateRealtimeOrderStatus} = userSlice.actions
 export default userSlice.reducer
