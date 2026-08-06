@@ -1,0 +1,72 @@
+version: "3.9"
+
+# ─── Reelbite Food Delivery – Docker Compose ─────────────────────────────────
+# Services: backend (Express/Socket.IO), frontend (React/Nginx), mongodb
+
+services:
+
+  # ── MongoDB ──────────────────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7-jammy
+    container_name: reelbite-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-secret}
+      MONGO_INITDB_DATABASE: reelbite
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - reelbite-net
+    # Expose only on the internal network (not to host) for security
+    # Remove/change the ports mapping below if you need external access
+    # ports:
+    #   - "27017:27017"
+
+  # ── Backend (Node.js / Express / Socket.IO) ───────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: reelbite-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      # Override MONGO_URI to point to the containerised MongoDB service
+      MONGO_URI: mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD:-secret}@mongodb:27017/reelbite?authSource=admin
+      PORT: 5000
+    depends_on:
+      - mongodb
+    volumes:
+      # Persist uploaded files across container restarts
+      - uploads:/app/public/uploads
+    networks:
+      - reelbite-net
+    # Expose backend port to host (optional, useful for debugging)
+    ports:
+      - "5000:5000"
+
+  # ── Frontend (React/Vite built, served by Nginx) ──────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: reelbite-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - reelbite-net
+    ports:
+      - "80:80"
+
+# ─── Named Volumes ────────────────────────────────────────────────────────────
+volumes:
+  mongo_data:
+  uploads:
+
+# ─── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  reelbite-net:
+    driver: bridge
