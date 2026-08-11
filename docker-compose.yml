@@ -1,6 +1,6 @@
-version: "3.9"
 
 # ─── Reelbite Food Delivery – Docker Compose ─────────────────────────────────
+
 # Services: backend (Express/Socket.IO), frontend (React/Nginx), mongodb
 
 services:
@@ -53,6 +53,15 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_FIREBASE_APIKEY: ${VITE_FIREBASE_APIKEY:-AIzaSyAOo7_Q7ou8yZmpWKbiSEykKo1uoKy-rn4}
+        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-reelbite-food-delivery.firebaseapp.com}
+        VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-reelbite-food-delivery}
+        VITE_FIREBASE_STORAGE_BUCKET: ${VITE_FIREBASE_STORAGE_BUCKET:-reelbite-food-delivery.firebasestorage.app}
+        VITE_FIREBASE_MESSAGING_SENDER_ID: ${VITE_FIREBASE_MESSAGING_SENDER_ID:-533665669672}
+        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-1:533665669672:web:9ee8ae29c778b6bec44b1d}
+        VITE_GEOAPIKEY: ${VITE_GEOAPIKEY:-d3c84e135bd24b69bd0408b13b36a120}
+        VITE_RAZORPAY_KEY_ID: ${VITE_RAZORPAY_KEY_ID:-rzp_test_TI3I0di14Tgla3}
     container_name: reelbite-frontend
     restart: unless-stopped
     depends_on:
