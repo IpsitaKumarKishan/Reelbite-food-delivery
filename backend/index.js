@@ -19,21 +19,33 @@ import { socketHandler } from "./socket.js"
 const app=express()
 const server=http.createServer(app)
 
-const io=new Server(server,{
-   cors:{
-    origin:"http://localhost:5173",
-    credentials:true,
-    methods:['POST','GET']
-}
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:80",
+  "http://localhost:5000",
+  "http://localhost",
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true);
+    }
+  },
+  credentials: true
+};
+
+const io = new Server(server, {
+  cors: corsOptions
 })
 
-app.set("io",io)
+app.set("io", io)
 
-const port=process.env.PORT || 5000
-app.use(cors({
-    origin:"http://localhost:5173",
-    credentials:true
-}))
+const port = process.env.PORT || 5000
+app.use(cors(corsOptions))
 app.use(express.json())
 app.use(cookieParser())
 app.use(express.static("public"))

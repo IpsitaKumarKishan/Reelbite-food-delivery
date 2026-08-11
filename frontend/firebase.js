@@ -6,7 +6,7 @@ import { getAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey:import.meta.env.VITE_FIREBASE_APIKEY,
+  apiKey: import.meta.env.VITE_FIREBASE_APIKEY || "AIzaSyAOo7_Q7ou8yZmpWKbiSEykKo1uoKy-rn4",
   authDomain: "reelbite-food-delivery.firebaseapp.com",
   projectId: "reelbite-food-delivery",
   storageBucket: "reelbite-food-delivery.firebasestorage.app",
@@ -16,5 +16,5 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const auth=getAuth(app)
-export {app,auth}
+const auth = getAuth(app);
+export { app, auth };
