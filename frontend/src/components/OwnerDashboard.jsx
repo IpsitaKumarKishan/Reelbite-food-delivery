@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import Nav from './NaV.JSX'
+import Nav from './Nav'
 import { useSelector } from 'react-redux'
 import { FaUtensils, FaPen, FaWallet, FaCheckCircle, FaClock, FaReceipt } from "react-icons/fa";
 import { useNavigate } from 'react-router-dom';
-import OwnerItemCard from './ownerItemCard';
+import OwnerItemCard from './OwnerItemCard';
 import axios from 'axios';
 import { serverUrl } from '../App';
 
