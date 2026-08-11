@@ -41,23 +41,21 @@ function SignUp() {
         }
      }
 
-     const handleGoogleAuth=async () => {
-        if(!mobile){
-          return setErr("mobile no is required")
-        }
-        const provider=new GoogleAuthProvider()
-        const result=await signInWithPopup(auth,provider)
-  try {
-    const {data}=await axios.post(`${serverUrl}/api/auth/google-auth`,{
-        fullName:result.user.displayName,
-        email:result.user.email,
-        role,
-        mobile
-    },{withCredentials:true})
-   dispatch(setUserData(data))
-  } catch (error) {
-    console.log(error)
-  }
+     const handleGoogleAuth = async () => {
+       try {
+         const provider = new GoogleAuthProvider()
+         const result = await signInWithPopup(auth, provider)
+         const { data } = await axios.post(`${serverUrl}/api/auth/google-auth`, {
+           fullName: result.user.displayName || fullName || result.user.email?.split("@")[0],
+           email: result.user.email,
+           role: role || "user",
+           mobile: mobile || result.user.phoneNumber || "0000000000"
+         }, { withCredentials: true })
+         dispatch(setUserData(data))
+       } catch (error) {
+         console.log(error)
+         setErr(error?.response?.data?.message || "Google Sign-Up failed")
+       }
      }
     return (
         <div className='min-h-screen w-full flex items-center justify-center p-4' style={{ backgroundColor: bgColor }}>

@@ -37,18 +37,22 @@ function SignIn() {
            setLoading(false)
         }
      }
-     const handleGoogleAuth=async () => {
-             const provider=new GoogleAuthProvider()
-             const result=await signInWithPopup(auth,provider)
+     const handleGoogleAuth = async () => {
        try {
-         const {data}=await axios.post(`${serverUrl}/api/auth/google-auth`,{
-             email:result.user.email,
-         },{withCredentials:true})
+         const provider = new GoogleAuthProvider()
+         const result = await signInWithPopup(auth, provider)
+         const { data } = await axios.post(`${serverUrl}/api/auth/google-auth`, {
+           fullName: result.user.displayName || result.user.email?.split("@")[0],
+           email: result.user.email,
+           mobile: result.user.phoneNumber || "0000000000",
+           role: "user"
+         }, { withCredentials: true })
          dispatch(setUserData(data))
        } catch (error) {
          console.log(error)
+         setErr(error?.response?.data?.message || "Google Sign-In failed")
        }
-          }
+     }
     return (
         <div className='min-h-screen w-full flex items-center justify-center p-4' style={{ backgroundColor: bgColor }}>
             <div className={`bg-white rounded-xl shadow-lg w-full max-w-md p-8 border-[1px] `} style={{
