@@ -1,4 +1,5 @@
 import User from "../models/user.model.js"
+import Item from "../models/item.model.js"
 
 const formatUserCart = (cartArray) => {
   if (!cartArray) return [];
@@ -166,3 +167,49 @@ export const updateDietPreference = async (req, res) => {
   }
 }
 
+/**
+ * PATCH /api/user/preferences
+ * Saves the user's preferred cuisine categories chosen during onboarding.
+ * Accepts { preferredCuisines: string[] }. An empty array (user skipped)
+ * is valid — the cold-start logic checks for non-empty before using it.
+ */
+export const updatePreferences = async (req, res) => {
+  try {
+    const { preferredCuisines } = req.body
+    if (!Array.isArray(preferredCuisines)) {
+      return res.status(400).json({ message: "preferredCuisines must be an array" })
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { preferredCuisines },
+      { new: true }
+    ).populate("cart.item")
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" })
+    }
+
+    const userObj = user.toObject()
+    userObj.cart = formatUserCart(user.cart)
+    return res.status(200).json(userObj)
+  } catch (error) {
+    return res.status(500).json({ message: `Update preferences error ${error}` })
+  }
+}
+
+/**
+ * GET /api/user/cuisine-categories
+ * Returns the distinct food item categories that exist in the database.
+ * Used by the onboarding UI to populate cuisine-selection buttons dynamically.
+ * Public endpoint (no auth required, but mounted behind isAuth in routes).
+ */
+export const getDistinctCategories = async (req, res) => {
+  try {
+    const categories = await Item.distinct("category")
+    const filtered = categories.filter(Boolean).sort()
+    return res.status(200).json({ categories: filtered })
+  } catch (error) {
+    return res.status(500).json({ message: `Get categories error ${error}` })
+  }
+}

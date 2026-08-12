@@ -118,6 +118,7 @@ export const createReel = async (req, res) => {
 
 import jwt from "jsonwebtoken";
 import ReelInteraction from "../models/reelInteraction.model.js";
+import User from "../models/user.model.js";
 
 export const getAllReels = async (req, res) => {
   try {
@@ -229,6 +230,26 @@ export const getAllReels = async (req, res) => {
 
     // 4. COMPOSITE SCORING (Affinity + Popularity + Recency)
     const { affinity: AF, popularity: POP, recency: REC, finalScore: FS } = RECOMMENDATION_WEIGHTS;
+
+    // 3b. PREFERENCE SEED (cold-start only)
+    //     If the user has no real interaction history but did set preferred
+    //     cuisines during onboarding, seed categoryAffinity with a modest
+    //     fixed value so those categories rank above unrelated reels.
+    //     Users who skipped onboarding (preferredCuisines=[]) are unaffected.
+    let hasPreferenceSeed = false;
+    if (!hasSufficientHistory && userId) {
+      const userDoc = await User.findById(userId).select("preferredCuisines").lean();
+      const prefs = userDoc?.preferredCuisines || [];
+      if (prefs.length > 0) {
+        prefs.forEach((cat) => {
+          if (cat) {
+            categoryAffinity[cat] = (categoryAffinity[cat] || 0) + FS.coldStart.preferenceSeed;
+          }
+        });
+        hasPreferenceSeed = true;
+      }
+    }
+
     const now = Date.now();
     const scoredReels = candidateReels.map((reel) => {
       const category = reel.foodItem?.category;
@@ -247,12 +268,20 @@ export const getAllReels = async (req, res) => {
 
       let finalScore = 0;
       if (hasSufficientHistory) {
+        // Full personalized scoring (interaction history)
+        finalScore =
+          affinityScore * FS.personalised.affinityMultiplier +
+          popularityScore * FS.personalised.popularityMultiplier +
+          recencyBoost;
+      } else if (hasPreferenceSeed) {
+        // Preference-seeded scoring: affinity from stated preferences + popularity
+        // Uses personalized multipliers so preferred categories clearly surface.
         finalScore =
           affinityScore * FS.personalised.affinityMultiplier +
           popularityScore * FS.personalised.popularityMultiplier +
           recencyBoost;
       } else {
-        // Cold-Start Fallback: Popularity + Recency
+        // Pure cold-start fallback: Popularity + Recency only
         finalScore = popularityScore * FS.coldStart.popularityMultiplier + recencyBoost;
       }
 

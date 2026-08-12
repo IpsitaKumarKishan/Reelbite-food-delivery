@@ -127,9 +127,15 @@ const userSlice = createSlice({
       if (state.userData) {
         state.userData.dietPreference = action.payload
       }
+    },
+
+    updateUserPreferredCuisines: (state, action) => {
+      if (state.userData) {
+        state.userData.preferredCuisines = action.payload
+      }
     }
   }
 })
 
-export const { setUserData, setCurrentAddress, setCurrentCity, setCurrentState, setShopsInMyCity, setItemsInMyCity, setCartItems, addToCart, updateQuantity, removeCartItem, clearCart, setMyOrders, addMyOrder, updateOrderStatus, setSearchItems, setTotalAmount, setSocket ,updateRealtimeOrderStatus, updateUserDietPreference} = userSlice.actions
+export const { setUserData, setCurrentAddress, setCurrentCity, setCurrentState, setShopsInMyCity, setItemsInMyCity, setCartItems, addToCart, updateQuantity, removeCartItem, clearCart, setMyOrders, addMyOrder, updateOrderStatus, setSearchItems, setTotalAmount, setSocket, updateRealtimeOrderStatus, updateUserDietPreference, updateUserPreferredCuisines } = userSlice.actions
 export default userSlice.reducer

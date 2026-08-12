@@ -3,7 +3,7 @@ import axios from "axios";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { serverUrl } from "../App";
-import { addToCart, updateUserDietPreference } from "../redux/userSlice";
+import { addToCart, updateUserDietPreference, updateUserPreferredCuisines } from "../redux/userSlice";
 import {
   FaHeart,
   FaRegHeart,
@@ -20,6 +20,102 @@ import {
 } from "react-icons/fa";
 
 const MAX_EXCLUDE_IDS = 100; // cap URL query string length
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CuisineOnboarding – shown once on first Reels visit when the user has not
+// yet chosen preferred cuisines. Skipping is always allowed.
+// ─────────────────────────────────────────────────────────────────────────────
+const CuisineOnboarding = ({ onDone }) => {
+  const dispatch = useDispatch();
+  const { userData } = useSelector((s) => s.user);
+  const [categories, setCategories] = useState([]);
+  const [selected, setSelected] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    axios
+      .get(`${serverUrl}/api/user/cuisine-categories`, {
+        withCredentials: true,
+      })
+      .then((r) => setCategories(r.data.categories || []))
+      .catch(() => setCategories([]));
+  }, []);
+
+  const toggle = (cat) =>
+    setSelected((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+    );
+
+  const handleSave = async (cuisines) => {
+    setSaving(true);
+    try {
+      const res = await axios.patch(
+        `${serverUrl}/api/user/preferences`,
+        { preferredCuisines: cuisines },
+        { withCredentials: true }
+      );
+      dispatch(updateUserPreferredCuisines(res.data.preferredCuisines || cuisines));
+    } catch (e) {
+      // Non-blocking: if save fails the user still gets to the feed
+    } finally {
+      setSaving(false);
+      onDone();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
+      <div className="bg-[#111] border border-white/10 rounded-3xl p-6 w-full max-w-sm shadow-2xl text-white space-y-5">
+        <div className="text-center space-y-1">
+          <div className="text-4xl">🍜</div>
+          <h2 className="text-xl font-black">What do you love to eat?</h2>
+          <p className="text-stone-400 text-xs">
+            Pick your favourites and we'll personalise your first feed.
+          </p>
+        </div>
+
+        {categories.length === 0 ? (
+          <div className="flex justify-center py-4">
+            <div className="w-8 h-8 border-4 border-[#ff5200] border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2 justify-center">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => toggle(cat)}
+                className={`px-4 py-2 rounded-full text-xs font-bold border transition ${
+                  selected.includes(cat)
+                    ? "bg-[#ff5200] border-[#ff5200] text-white shadow-lg scale-105"
+                    : "bg-white/5 border-white/15 text-stone-300 hover:border-[#ff5200]/60 hover:text-white"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-1">
+          <button
+            onClick={() => handleSave([])}
+            disabled={saving}
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold border border-white/15 text-stone-400 hover:text-white hover:border-white/40 transition"
+          >
+            Skip
+          </button>
+          <button
+            onClick={() => handleSave(selected)}
+            disabled={saving || selected.length === 0}
+            className="flex-1 py-2.5 rounded-xl text-xs font-extrabold bg-[#ff5200] hover:bg-[#c2410c] text-white transition disabled:opacity-40 disabled:cursor-not-allowed shadow-lg"
+          >
+            {saving ? "Saving…" : `Let's Go${selected.length > 0 ? ` (${selected.length})` : ""}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ReelCard = ({ reel, currentUser, onSkip }) => {
   const videoRef = useRef(null);
@@ -325,6 +421,8 @@ const Reels = () => {
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  // Onboarding modal: shown to logged-in users whose preferredCuisines is empty.
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const dispatch = useDispatch();
   const { userData, currentCity } = useSelector((state) => state.user);
   const navigate = useNavigate();
@@ -358,6 +456,25 @@ const Reels = () => {
     setHasMore(true);
     fetchReels(1, true);
   }, [currentCity, userData?.dietPreference]);
+
+  // Show onboarding once when a logged-in user hasn't set any cuisine preferences.
+  useEffect(() => {
+    if (userData && Array.isArray(userData.preferredCuisines) && userData.preferredCuisines.length === 0) {
+      setShowOnboarding(true);
+    }
+  }, [userData?._id]); // fire once per user session, not on every re-render
+
+  // Called when user saves or skips onboarding. Reset and refetch so the
+  // backend's preference-seed logic runs immediately on the first feed page.
+  const handleOnboardingDone = () => {
+    setShowOnboarding(false);
+    seenIdsRef.current = new Set();
+    skippedCategoryMapRef.current = {};
+    setReels([]);
+    setCurrentPage(1);
+    setHasMore(true);
+    fetchReels(1, true);
+  };
 
   // Infinite-scroll observer
   useEffect(() => {
@@ -448,6 +565,9 @@ const Reels = () => {
 
   return (
     <div className="relative min-h-screen bg-black font-sans">
+      {/* Cuisine onboarding modal — shown once for new users with no preferences */}
+      {showOnboarding && <CuisineOnboarding onDone={handleOnboardingDone} />}
+
       <div className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/80 to-transparent p-4 flex items-center justify-between text-white">
         <button
           onClick={() => navigate("/")}

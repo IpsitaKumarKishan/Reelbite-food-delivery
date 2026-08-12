@@ -60,6 +60,10 @@ const RECOMMENDATION_WEIGHTS = {
     // Cold-start path (hasSufficientHistory = false)
     coldStart: {
       popularityMultiplier: 3,
+      // Modest seed added to categoryAffinity for each category the user
+      // selected during onboarding. Enough to surface preferred categories
+      // above unrelated reels, but not so large it overrides popularity.
+      preferenceSeed: 5,
     },
     // Session-level skip penalty: subtracted from finalScore when a reel's
     // category appears in the request's penalizedCategories list.

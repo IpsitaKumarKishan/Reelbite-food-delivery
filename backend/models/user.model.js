@@ -55,6 +55,13 @@ coordinates:{type:[Number],default:[0,0]}
      type: String,
      enum: ["veg", "all"],
      default: "all"
+   },
+   // Cuisine categories the user explicitly selected during onboarding.
+   // Empty array = user skipped onboarding; cold-start falls through to
+   // pure popularity + recency (unchanged behavior).
+   preferredCuisines: {
+     type: [String],
+     default: []
    }
   
 }, { timestamps: true })

@@ -7,7 +7,9 @@ import {
   updateCartQuantityBackend,
   removeCartItemBackend,
   clearCartBackend,
-  updateDietPreference
+  updateDietPreference,
+  updatePreferences,
+  getDistinctCategories
 } from "../controllers/user.controllers.js"
 import isAuth from "../middlewares/isAuth.js"
 
@@ -23,5 +25,9 @@ userRouter.post('/cart/add', isAuth, addToCartBackend)
 userRouter.put('/cart/update', isAuth, updateCartQuantityBackend)
 userRouter.delete('/cart/remove/:itemId', isAuth, removeCartItemBackend)
 userRouter.delete('/cart/clear', isAuth, clearCartBackend)
+
+// Onboarding / preference endpoints
+userRouter.patch('/preferences', isAuth, updatePreferences)
+userRouter.get('/cuisine-categories', isAuth, getDistinctCategories)
 
 export default userRouter
