@@ -61,6 +61,10 @@ const RECOMMENDATION_WEIGHTS = {
     coldStart: {
       popularityMultiplier: 3,
     },
+    // Session-level skip penalty: subtracted from finalScore when a reel's
+    // category appears in the request's penalizedCategories list.
+    // Keeps penalised reels visible but pushes them lower in the feed.
+    skipPenalty: 30,
   },
 
   // ─── Exploration / Diversity ───────────────────────────────────────────────

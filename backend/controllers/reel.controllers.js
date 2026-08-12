@@ -125,7 +125,15 @@ export const getAllReels = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const { city, dietPreference } = req.query;
+    const { city, dietPreference, excludeIds, penalizedCategories } = req.query;
+
+    // Parse session-dedup and skip-penalty params (both fully optional)
+    const excludeIdSet = excludeIds
+      ? new Set(excludeIds.split(",").map((id) => id.trim()).filter(Boolean))
+      : new Set();
+    const penalizedCategorySet = penalizedCategories
+      ? new Set(penalizedCategories.split(",").map((c) => c.trim()).filter(Boolean))
+      : new Set();
 
     // Identify user if token is provided in cookies or auth header
     let userId = req.userId;
@@ -155,7 +163,13 @@ export const getAllReels = async (req, res) => {
     }
 
     // Fetch candidate pool passing hard location & diet filters
-    const candidateReels = await Reel.find(reelQuery)
+    // excludeIds: $nin filter to avoid showing already-seen reels in this session.
+    const reelFindQuery = { ...reelQuery };
+    if (excludeIdSet.size > 0) {
+      // Convert string IDs to ObjectIds via Mongoose's cast
+      reelFindQuery._id = { $nin: Array.from(excludeIdSet) };
+    }
+    const candidateReels = await Reel.find(reelFindQuery)
       .populate("owner", "fullName email")
       .populate("shop", "name city image")
       .populate("foodItem", "name price image category foodType rating shop");
@@ -240,6 +254,12 @@ export const getAllReels = async (req, res) => {
       } else {
         // Cold-Start Fallback: Popularity + Recency
         finalScore = popularityScore * FS.coldStart.popularityMultiplier + recencyBoost;
+      }
+
+      // Session skip penalty: deprioritize (but don't hide) categories the user
+      // skipped during the current browsing session, passed via penalizedCategories.
+      if (category && penalizedCategorySet.has(category)) {
+        finalScore -= FS.skipPenalty;
       }
 
       return { reel, finalScore, category };

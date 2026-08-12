@@ -19,7 +19,9 @@ import {
   FaComment,
 } from "react-icons/fa";
 
-const ReelCard = ({ reel, currentUser }) => {
+const MAX_EXCLUDE_IDS = 100; // cap URL query string length
+
+const ReelCard = ({ reel, currentUser, onSkip }) => {
   const videoRef = useRef(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -46,6 +48,11 @@ const ReelCard = ({ reel, currentUser }) => {
     }
     const watchPercentage = Math.min(100, Math.round((watchMs / (durationSec * 1000)) * 100));
     const isSkipped = watchPercentage < 15 && !extraFlags.liked && !extraFlags.addedToCart && !extraFlags.shared;
+
+    // Notify parent about a strong skip so it can track the category client-side
+    if (isSkipped && reel.foodItem?.category) {
+      onSkip?.(reel.foodItem.category);
+    }
 
     axios.post(
       `${serverUrl}/api/reels/${reel._id}/interaction`,
@@ -314,30 +321,115 @@ const ReelCard = ({ reel, currentUser }) => {
 const Reels = () => {
   const [reels, setReels] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const dispatch = useDispatch();
   const { userData, currentCity } = useSelector((state) => state.user);
   const navigate = useNavigate();
 
+  // ── Session-level in-memory tracking (no DB, no Redis) ─────────────────────
+  // Set of reel _id strings shown so far this session (capped to avoid
+  // an unbounded query string). Passed to backend as excludeIds.
+  const seenIdsRef = useRef(new Set());
+
+  // Map of category -> skip count for reels strongly skipped this session.
+  // Passed to backend as penalizedCategories when count >= 1.
+  const skippedCategoryMapRef = useRef({});
+
+  // Callback handed to ReelCard; fires when the user strongly skips a reel.
+  const handleSkip = (category) => {
+    if (!category) return;
+    skippedCategoryMapRef.current[category] =
+      (skippedCategoryMapRef.current[category] || 0) + 1;
+  };
+
+  // Sentinel div at the bottom of the feed; triggers next-page load.
+  const loadMoreRef = useRef(null);
+  const isFetchingRef = useRef(false);
+
+  // Reset session when city or diet changes (fresh feed context)
   useEffect(() => {
-    fetchReels();
+    seenIdsRef.current = new Set();
+    skippedCategoryMapRef.current = {};
+    setReels([]);
+    setCurrentPage(1);
+    setHasMore(true);
+    fetchReels(1, true);
   }, [currentCity, userData?.dietPreference]);
 
-  const fetchReels = async () => {
+  // Infinite-scroll observer
+  useEffect(() => {
+    const sentinel = loadMoreRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isFetchingRef.current) {
+          setCurrentPage((prev) => {
+            const next = prev + 1;
+            fetchReels(next);
+            return next;
+          });
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, currentCity, userData?.dietPreference]);
+
+  /**
+   * Fetches one page of reels, appending to the existing feed.
+   * @param {number} page          - 1-indexed page number
+   * @param {boolean} isReset      - true on first load / filter change
+   */
+  const fetchReels = async (page = 1, isReset = false) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     try {
-      setLoading(true);
+      if (isReset) setLoading(true);
+      else setLoadingMore(true);
+
+      // Build excludeIds from session-seen set (capped at MAX_EXCLUDE_IDS)
+      const seenArr = Array.from(seenIdsRef.current);
+      const excludeIds = seenArr.slice(-MAX_EXCLUDE_IDS).join(",");
+
+      // Build penalizedCategories from session skip map (include any category
+      // with at least 1 strong skip this session)
+      const penalizedCategories = Object.keys(skippedCategoryMapRef.current)
+        .filter((cat) => skippedCategoryMapRef.current[cat] >= 1)
+        .join(",");
+
+      const params = {
+        page,
+        limit: 10,
+        city: currentCity || "",
+        dietPreference: userData?.dietPreference || "all",
+      };
+      if (excludeIds) params.excludeIds = excludeIds;
+      if (penalizedCategories) params.penalizedCategories = penalizedCategories;
+
       const res = await axios.get(`${serverUrl}/api/reels`, {
-        params: {
-          city: currentCity || "",
-          dietPreference: userData?.dietPreference || "all",
-        },
+        params,
         withCredentials: true,
       });
-      setReels(res.data.reels || []);
+
+      const incoming = res.data.reels || [];
+
+      // Register new reel IDs as seen
+      incoming.forEach((r) => seenIdsRef.current.add(r._id));
+
+      setReels((prev) => (isReset ? incoming : [...prev, ...incoming]));
+      setHasMore(res.data.currentPage < res.data.totalPages && incoming.length > 0);
     } catch (err) {
       setError("Failed to load food reels");
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+      isFetchingRef.current = false;
     }
   };
 
@@ -438,8 +530,25 @@ const Reels = () => {
       ) : (
         <div className="h-screen w-full overflow-y-scroll snap-y snap-mandatory scrollbar-none">
           {reels.map((reel) => (
-            <ReelCard key={reel._id} reel={reel} currentUser={userData} />
+            <ReelCard
+              key={reel._id}
+              reel={reel}
+              currentUser={userData}
+              onSkip={handleSkip}
+            />
           ))}
+
+          {/* Sentinel: entering viewport triggers next page load */}
+          {hasMore && (
+            <div
+              ref={loadMoreRef}
+              className="h-screen w-full snap-start snap-always flex items-center justify-center bg-black"
+            >
+              {loadingMore && (
+                <div className="w-10 h-10 border-4 border-[#ff5200] border-t-transparent rounded-full animate-spin" />
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
