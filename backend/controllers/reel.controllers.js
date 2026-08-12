@@ -4,6 +4,7 @@ import Item from "../models/item.model.js";
 import uploadOnCloudinary, { uploadVideoOnCloudinary } from "../utils/cloudinary.js";
 import fs from "fs";
 import path from "path";
+import RECOMMENDATION_WEIGHTS from "../config/recommendationWeights.js";
 
 export const createReel = async (req, res) => {
   try {
@@ -160,9 +161,13 @@ export const getAllReels = async (req, res) => {
       .populate("foodItem", "name price image category foodType rating shop");
 
     // 3. AFFINITY SCORE: Compute user interest profile from recent interaction history
+    //    Time-decay: multiply each interaction's weight by exp(-ageInDays / halfLifeDays)
+    //    so that older interactions contribute less to affinity than recent ones.
     const categoryAffinity = {};
     const shopAffinity = {};
     let hasSufficientHistory = false;
+
+    const { interaction: IW, watchThresholds: WT, decay: DC } = RECOMMENDATION_WEIGHTS;
 
     if (userId) {
       const recentInteractions = await ReelInteraction.find({ user: userId })
@@ -179,27 +184,37 @@ export const getAllReels = async (req, res) => {
 
       if (recentInteractions && recentInteractions.length >= 2) {
         hasSufficientHistory = true;
+
+        const nowMs = Date.now();
         recentInteractions.forEach((inter) => {
           const category = inter.reel?.foodItem?.category;
           const shopIdStr = inter.reel?.shop?._id?.toString() || inter.reel?.shop?.toString();
 
-          let weight = 1;
-          if (inter.addedToCart) weight = 10;
-          else if (inter.liked || inter.shared) weight = 5;
-          else if (inter.watchPercentage > 70) weight = 3;
-          else if (inter.skipped || inter.watchPercentage < 15) weight = -3;
+          // Base interaction weight
+          let weight = IW.default;
+          if (inter.addedToCart) weight = IW.addedToCart;
+          else if (inter.liked || inter.shared) weight = IW.likedOrShared;
+          else if (inter.watchPercentage > WT.high) weight = IW.highWatch;
+          else if (inter.skipped || inter.watchPercentage < WT.low) weight = IW.negativeSignal;
+
+          // Time-decay: more recent interactions carry their full weight;
+          // interactions from HALF_LIFE_DAYS ago carry ~37% of original weight.
+          const ageInDays = (nowMs - new Date(inter.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+          const decayFactor = Math.exp(-ageInDays / DC.halfLifeDays);
+          const decayedWeight = weight * decayFactor;
 
           if (category) {
-            categoryAffinity[category] = (categoryAffinity[category] || 0) + weight;
+            categoryAffinity[category] = (categoryAffinity[category] || 0) + decayedWeight;
           }
           if (shopIdStr) {
-            shopAffinity[shopIdStr] = (shopAffinity[shopIdStr] || 0) + weight;
+            shopAffinity[shopIdStr] = (shopAffinity[shopIdStr] || 0) + decayedWeight;
           }
         });
       }
     }
 
     // 4. COMPOSITE SCORING (Affinity + Popularity + Recency)
+    const { affinity: AF, popularity: POP, recency: REC, finalScore: FS } = RECOMMENDATION_WEIGHTS;
     const now = Date.now();
     const scoredReels = candidateReels.map((reel) => {
       const category = reel.foodItem?.category;
@@ -207,21 +222,24 @@ export const getAllReels = async (req, res) => {
 
       const catScore = category ? (categoryAffinity[category] || 0) : 0;
       const shpScore = shopIdStr ? (shopAffinity[shopIdStr] || 0) : 0;
-      const affinityScore = catScore * 1.5 + shpScore * 1.0;
+      const affinityScore = catScore * AF.categoryMultiplier + shpScore * AF.shopMultiplier;
 
       const likesCount = reel.likes?.length || 0;
       const viewsCount = reel.views || 0;
-      const popularityScore = likesCount * 3 + viewsCount * 0.5;
+      const popularityScore = likesCount * POP.likesMultiplier + viewsCount * POP.viewsMultiplier;
 
       const hoursOld = (now - new Date(reel.createdAt).getTime()) / (1000 * 60 * 60);
-      const recencyBoost = Math.max(0, 50 - hoursOld * 0.5);
+      const recencyBoost = Math.max(0, REC.baseBoost - hoursOld * REC.decayPerHour);
 
       let finalScore = 0;
       if (hasSufficientHistory) {
-        finalScore = affinityScore * 4 + popularityScore * 1.5 + recencyBoost;
+        finalScore =
+          affinityScore * FS.personalised.affinityMultiplier +
+          popularityScore * FS.personalised.popularityMultiplier +
+          recencyBoost;
       } else {
         // Cold-Start Fallback: Popularity + Recency
-        finalScore = popularityScore * 3 + recencyBoost;
+        finalScore = popularityScore * FS.coldStart.popularityMultiplier + recencyBoost;
       }
 
       return { reel, finalScore, category };
@@ -231,33 +249,87 @@ export const getAllReels = async (req, res) => {
     scoredReels.sort((a, b) => b.finalScore - a.finalScore);
 
     // 5. EXPLORATION INJECTION (~15–20% slots reserved for exploration)
+    //    Softmax-weighted rotation across the user's top-N affinity categories,
+    //    so the feed diversifies rather than being pinned to a single category.
     let orderedReels = scoredReels.map((item) => item.reel);
 
+    const { exploration: EXP } = RECOMMENDATION_WEIGHTS;
+
     if (hasSufficientHistory && scoredReels.length > 3) {
-      const topCategories = Object.keys(categoryAffinity).sort(
-        (a, b) => categoryAffinity[b] - categoryAffinity[a]
-      );
-      const topCat = topCategories[0];
+      // Gather top-N categories by accumulated (decayed) affinity score
+      const sortedCategories = Object.keys(categoryAffinity)
+        .filter((cat) => categoryAffinity[cat] > 0)
+        .sort((a, b) => categoryAffinity[b] - categoryAffinity[a]);
 
-      if (topCat) {
-        const topCategoryItems = scoredReels.filter((item) => item.category === topCat);
-        const explorationItems = scoredReels.filter((item) => item.category !== topCat);
+      const topCats = sortedCategories.slice(0, EXP.topCategoriesCount);
 
-        if (explorationItems.length > 0 && topCategoryItems.length > 0) {
-          const combined = [];
-          let topIdx = 0;
-          let expIdx = 0;
+      if (topCats.length > 0) {
+        // Softmax over the top-N affinity scores → probability distribution
+        const topAffinityValues = topCats.map((cat) => categoryAffinity[cat]);
+        const expValues = topAffinityValues.map((v) => Math.exp(v));
+        const expSum = expValues.reduce((s, v) => s + v, 0);
+        const softmaxWeights = expValues.map((v) => v / expSum);
 
-          for (let i = 0; i < scoredReels.length; i++) {
-            // Insert 1 exploration reel every 5 positions (20%)
-            if ((i + 1) % 5 === 0 && expIdx < explorationItems.length) {
-              combined.push(explorationItems[expIdx++].reel);
-            } else if (topIdx < topCategoryItems.length) {
-              combined.push(topCategoryItems[topIdx++].reel);
-            } else if (expIdx < explorationItems.length) {
-              combined.push(explorationItems[expIdx++].reel);
+        // Build cumulative distribution for weighted random sampling
+        const cdf = [];
+        softmaxWeights.reduce((acc, w, i) => {
+          cdf[i] = acc + w;
+          return cdf[i];
+        }, 0);
+
+        // Helper: pick a category index from the softmax distribution
+        const sampleCategoryIndex = () => {
+          const r = Math.random();
+          for (let i = 0; i < cdf.length; i++) {
+            if (r <= cdf[i]) return i;
+          }
+          return cdf.length - 1;
+        };
+
+        // Separate reels into buckets: one per top-category + one for exploration
+        const catBuckets = {};
+        topCats.forEach((cat) => { catBuckets[cat] = []; });
+        const explorationItems = [];
+
+        scoredReels.forEach((item) => {
+          if (item.category && catBuckets[item.category]) {
+            catBuckets[item.category].push(item.reel);
+          } else {
+            explorationItems.push(item.reel);
+          }
+        });
+
+        // Pointers into each category bucket
+        const catPointers = {};
+        topCats.forEach((cat) => { catPointers[cat] = 0; });
+        let expIdx = 0;
+
+        const combined = [];
+        for (let i = 0; i < scoredReels.length; i++) {
+          if ((i + 1) % EXP.slotInterval === 0 && expIdx < explorationItems.length) {
+            // Exploration slot: insert a reel outside the top-N categories
+            combined.push(explorationItems[expIdx++]);
+          } else {
+            // Exploit slot: pick from a softmax-sampled top category
+            // Try up to topCats.length times to find a non-empty bucket
+            let pushed = false;
+            for (let attempt = 0; attempt < topCats.length; attempt++) {
+              const catIdx = sampleCategoryIndex();
+              const cat = topCats[catIdx];
+              if (catPointers[cat] < catBuckets[cat].length) {
+                combined.push(catBuckets[cat][catPointers[cat]++]);
+                pushed = true;
+                break;
+              }
+            }
+            // Fallback if all top-category buckets are exhausted
+            if (!pushed && expIdx < explorationItems.length) {
+              combined.push(explorationItems[expIdx++]);
             }
           }
+        }
+
+        if (combined.length > 0) {
           orderedReels = combined;
         }
       }
