@@ -6,6 +6,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import useGetCurrentUser from './hooks/useGetCurrentUser'
 import { useDispatch, useSelector } from 'react-redux'
 import Home from './pages/Home'
+import LandingPage from './pages/LandingPage'
 import useGetCity from './hooks/useGetCity'
 import useGetMyshop from './hooks/useGetMyShop'
 import CreateEditShop from './pages/CreateEditShop'
@@ -60,7 +61,8 @@ function App() {
     <Route path='/signup' element={!userData?<SignUp/>:<Navigate to={"/"}/>}/>
     <Route path='/signin' element={!userData?<SignIn/>:<Navigate to={"/"}/>}/>
     <Route path='/forgot-password' element={!userData?<ForgotPassword/>:<Navigate to={"/"}/>}/>
-    <Route path='/' element={userData?<Home/>:<Navigate to={"/signin"}/>}/>
+    <Route path='/' element={userData?<Home/>:<LandingPage/>}/>
+    <Route path='/landing' element={<LandingPage/>}/>
     <Route path='/reels' element={<Reels/>}/>
     <Route path='/owner/reels' element={userData && userData.role === "owner" ? <OwnerReels/> : <Navigate to={"/"}/>}/>
     <Route path='/create-edit-shop' element={userData?<CreateEditShop/>:<Navigate to={"/signin"}/>}/>

@@ -93,22 +93,23 @@ export const deleteItem = async (req, res) => {
 export const getItemByCity = async (req, res) => {
     try {
         const { city } = req.params
-        if (!city) {
-            return res.status(400).json({ message: "city is required" })
+        let shops = []
+        if (city && city !== "null" && city !== "undefined" && city !== "all") {
+            shops = await Shop.find({
+                city: { $regex: new RegExp(city, "i") }
+            }).populate('items')
         }
-        const shops = await Shop.find({
-            city: { $regex: new RegExp(`^${city}$`, "i") }
-        }).populate('items')
-        if (!shops) {
-            return res.status(400).json({ message: "shops not found" })
+        
+        if (!shops || shops.length === 0) {
+            shops = await Shop.find({}).populate('items')
         }
-        const shopIds=shops.map((shop)=>shop._id)
-
-        const items=await Item.find({shop:{$in:shopIds}})
+        
+        const shopIds = shops.map((shop) => shop._id)
+        const items = await Item.find({ shop: { $in: shopIds } })
         return res.status(200).json(items)
 
     } catch (error) {
- return res.status(500).json({ message: `get item by city error ${error}` })
+        return res.status(500).json({ message: `get item by city error ${error}` })
     }
 }
 
