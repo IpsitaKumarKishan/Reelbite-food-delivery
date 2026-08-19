@@ -118,6 +118,7 @@ export const createReel = async (req, res) => {
 
 import jwt from "jsonwebtoken";
 import ReelInteraction from "../models/reelInteraction.model.js";
+import Impression from "../models/impression.model.js";
 import User from "../models/user.model.js";
 
 export const getAllReels = async (req, res) => {
@@ -126,7 +127,7 @@ export const getAllReels = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const { city, dietPreference, excludeIds, penalizedCategories } = req.query;
+    const { city, excludeIds, penalizedCategories } = req.query;
 
     // Parse session-dedup and skip-penalty params (both fully optional)
     const excludeIdSet = excludeIds
@@ -156,14 +157,7 @@ export const getAllReels = async (req, res) => {
       reelQuery.shop = { $in: shopIds };
     }
 
-    // 2. HARD FILTER: Conditional diet filter (veg only vs all)
-    if (dietPreference === "veg") {
-      const matchingVegItems = await Item.find({ foodType: "veg" }).select("_id");
-      const itemIds = matchingVegItems.map((i) => i._id);
-      reelQuery.foodItem = { $in: itemIds };
-    }
-
-    // Fetch candidate pool passing hard location & diet filters
+    // Fetch candidate pool passing hard location filter
     // excludeIds: $nin filter to avoid showing already-seen reels in this session.
     const reelFindQuery = { ...reelQuery };
     if (excludeIdSet.size > 0) {
@@ -225,6 +219,43 @@ export const getAllReels = async (req, res) => {
             shopAffinity[shopIdStr] = (shopAffinity[shopIdStr] || 0) + decayedWeight;
           }
         });
+
+        // Exposure Normalization: normalize raw affinities by impression counts
+        // to prevent frequently-shown categories from dominating over genuinely preferred ones.
+        const { exposure: EXP_NORM } = RECOMMENDATION_WEIGHTS;
+        const recentImpressions = await Impression.find({ user: userId })
+          .sort({ shownAt: -1 })
+          .limit(500)
+          .lean();
+
+        if (recentImpressions && recentImpressions.length >= (EXP_NORM?.minImpressionsRequired || 20)) {
+          const categoryImpressionCount = {};
+          const shopImpressionCount = {};
+
+          recentImpressions.forEach((imp) => {
+            if (imp.category) {
+              categoryImpressionCount[imp.category] = (categoryImpressionCount[imp.category] || 0) + 1;
+            }
+            if (imp.shop) {
+              const shopStr = imp.shop.toString();
+              shopImpressionCount[shopStr] = (shopImpressionCount[shopStr] || 0) + 1;
+            }
+          });
+
+          const smoothingK = EXP_NORM?.smoothingK || 5;
+
+          // Normalize categoryAffinity
+          Object.keys(categoryAffinity).forEach((cat) => {
+            const count = categoryImpressionCount[cat] || 0;
+            categoryAffinity[cat] = categoryAffinity[cat] / (count + smoothingK);
+          });
+
+          // Normalize shopAffinity
+          Object.keys(shopAffinity).forEach((shopKey) => {
+            const count = shopImpressionCount[shopKey] || 0;
+            shopAffinity[shopKey] = shopAffinity[shopKey] / (count + smoothingK);
+          });
+        }
       }
     }
 
@@ -304,7 +335,7 @@ export const getAllReels = async (req, res) => {
 
     const { exploration: EXP } = RECOMMENDATION_WEIGHTS;
 
-    if (hasSufficientHistory && scoredReels.length > 3) {
+    if ((hasSufficientHistory || hasPreferenceSeed) && scoredReels.length > 3) {
       // Gather top-N categories by accumulated (decayed) affinity score
       const sortedCategories = Object.keys(categoryAffinity)
         .filter((cat) => categoryAffinity[cat] > 0)
@@ -460,5 +491,58 @@ export const deleteReel = async (req, res) => {
     return res.status(200).json({ message: "Reel deleted successfully" });
   } catch (error) {
     return res.status(500).json({ message: "Failed to delete reel", error: error.message });
+  }
+};
+
+export const recordImpressions = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { reelIds } = req.body;
+
+    if (!Array.isArray(reelIds) || reelIds.length === 0) {
+      return res.status(200).json({ message: "No reel IDs provided", count: 0 });
+    }
+
+    // Cap array at 50 per call
+    const cappedIds = reelIds.slice(0, 50);
+
+    const reels = await Reel.find({ _id: { $in: cappedIds } })
+      .populate("foodItem", "category")
+      .select("_id foodItem shop");
+
+    if (!reels || reels.length === 0) {
+      return res.status(200).json({ message: "No matching reels found", count: 0 });
+    }
+
+    const reelMap = new Map();
+    reels.forEach((r) => reelMap.set(r._id.toString(), r));
+
+    const impressionsToInsert = [];
+    const now = new Date();
+
+    cappedIds.forEach((id) => {
+      const reel = reelMap.get(id?.toString());
+      if (reel) {
+        impressionsToInsert.push({
+          user: userId,
+          reel: reel._id,
+          category: reel.foodItem?.category || undefined,
+          shop: reel.shop || undefined,
+          shownAt: now,
+        });
+      }
+    });
+
+    if (impressionsToInsert.length > 0) {
+      await Impression.insertMany(impressionsToInsert, { ordered: false });
+    }
+
+    return res.status(201).json({
+      message: "Impressions recorded successfully",
+      count: impressionsToInsert.length,
+    });
+  } catch (error) {
+    console.error("Record impressions error:", error);
+    return res.status(500).json({ message: "Failed to record impressions", error: error.message });
   }
 };

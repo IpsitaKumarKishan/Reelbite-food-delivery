@@ -79,6 +79,12 @@ const RECOMMENDATION_WEIGHTS = {
     // How many top-affinity categories to rotate across for "exploit" slots.
     topCategoriesCount: 3,
   },
+
+  // ─── Exposure Normalization ────────────────────────────────────────────────
+  exposure: {
+    smoothingK: 5,
+    minImpressionsRequired: 20,
+  },
 };
 
 export default RECOMMENDATION_WEIGHTS;

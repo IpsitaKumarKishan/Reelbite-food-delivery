@@ -3,7 +3,7 @@ import axios from "axios";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { serverUrl } from "../App";
-import { addToCart, updateUserDietPreference, updateUserPreferredCuisines } from "../redux/userSlice";
+import { addToCart, updateUserPreferredCuisines } from "../redux/userSlice";
 import {
   FaHeart,
   FaRegHeart,
@@ -117,7 +117,7 @@ const CuisineOnboarding = ({ onDone }) => {
   );
 };
 
-const ReelCard = ({ reel, currentUser, onSkip }) => {
+const ReelCard = ({ reel, currentUser, onSkip, onImpression }) => {
   const videoRef = useRef(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -174,6 +174,7 @@ const ReelCard = ({ reel, currentUser, onSkip }) => {
           if (entry.isIntersecting) {
             startTimeRef.current = Date.now();
             hasLoggedRef.current = false;
+            onImpression?.(reel._id);
             videoElement
               .play()
               .then(() => setIsPlaying(true))
@@ -436,6 +437,9 @@ const Reels = () => {
   // Passed to backend as penalizedCategories when count >= 1.
   const skippedCategoryMapRef = useRef({});
 
+  // Queue of reel IDs waiting to be flushed to /api/reels/impressions.
+  const impressionQueueRef = useRef([]);
+
   // Callback handed to ReelCard; fires when the user strongly skips a reel.
   const handleSkip = (category) => {
     if (!category) return;
@@ -443,11 +447,50 @@ const Reels = () => {
       (skippedCategoryMapRef.current[category] || 0) + 1;
   };
 
+  // Flushes the impression queue to the server
+  const flushImpressions = () => {
+    if (!userData || impressionQueueRef.current.length === 0) return;
+    const idsToFlush = [...impressionQueueRef.current];
+    impressionQueueRef.current = [];
+    axios
+      .post(
+        `${serverUrl}/api/reels/impressions`,
+        { reelIds: idsToFlush },
+        { withCredentials: true }
+      )
+      .catch(() => {});
+  };
+
+  // Handed to ReelCard; fires when a reel becomes the active/watched reel.
+  const handleImpression = (reelId) => {
+    if (!userData || !reelId) return;
+    impressionQueueRef.current.push(reelId);
+    if (impressionQueueRef.current.length >= 5) {
+      flushImpressions();
+    }
+  };
+
+  // Periodically flush impression queue every 3 seconds, and flush on unmount
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (impressionQueueRef.current.length > 0) {
+        flushImpressions();
+      }
+    }, 3000);
+
+    return () => {
+      clearInterval(interval);
+      if (impressionQueueRef.current.length > 0) {
+        flushImpressions();
+      }
+    };
+  }, [userData]);
+
   // Sentinel div at the bottom of the feed; triggers next-page load.
   const loadMoreRef = useRef(null);
   const isFetchingRef = useRef(false);
 
-  // Reset session when city or diet changes (fresh feed context)
+  // Reset session when city changes (fresh feed context)
   useEffect(() => {
     seenIdsRef.current = new Set();
     skippedCategoryMapRef.current = {};
@@ -455,7 +498,7 @@ const Reels = () => {
     setCurrentPage(1);
     setHasMore(true);
     fetchReels(1, true);
-  }, [currentCity, userData?.dietPreference]);
+  }, [currentCity]);
 
   // Show onboarding once when a logged-in user hasn't set any cuisine preferences.
   useEffect(() => {
@@ -495,7 +538,7 @@ const Reels = () => {
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMore, currentCity, userData?.dietPreference]);
+  }, [hasMore, currentCity]);
 
   /**
    * Fetches one page of reels, appending to the existing feed.
@@ -524,7 +567,6 @@ const Reels = () => {
         page,
         limit: 10,
         city: currentCity || "",
-        dietPreference: userData?.dietPreference || "all",
       };
       if (excludeIds) params.excludeIds = excludeIds;
       if (penalizedCategories) params.penalizedCategories = penalizedCategories;
@@ -550,19 +592,6 @@ const Reels = () => {
     }
   };
 
-  const handleToggleDiet = async (pref) => {
-    dispatch(updateUserDietPreference(pref));
-    if (userData) {
-      try {
-        await axios.put(
-          `${serverUrl}/api/user/diet-preference`,
-          { dietPreference: pref },
-          { withCredentials: true }
-        );
-      } catch (e) {}
-    }
-  };
-
   return (
     <div className="relative min-h-screen bg-black font-sans">
       {/* Cuisine onboarding modal — shown once for new users with no preferences */}
@@ -576,29 +605,6 @@ const Reels = () => {
           <FaArrowLeft />
           <span>Home</span>
         </button>
-
-        <div className="flex items-center bg-black/50 p-1 rounded-full backdrop-blur-md border border-white/10 text-xs font-bold">
-          <button
-            onClick={() => handleToggleDiet("all")}
-            className={`px-3 py-1 rounded-full transition ${
-              (userData?.dietPreference || "all") === "all"
-                ? "bg-[#ff5200] text-white shadow"
-                : "text-stone-300 hover:text-white"
-            }`}
-          >
-            All 🍕
-          </button>
-          <button
-            onClick={() => handleToggleDiet("veg")}
-            className={`px-3 py-1 rounded-full transition ${
-              userData?.dietPreference === "veg"
-                ? "bg-emerald-600 text-white shadow"
-                : "text-stone-300 hover:text-white"
-            }`}
-          >
-            Veg 🌱
-          </button>
-        </div>
 
         {userData?.role === "owner" ? (
           <button
@@ -626,18 +632,8 @@ const Reels = () => {
           <div className="text-6xl">🎬</div>
           <h2 className="text-2xl font-black text-white">No Matching Reels Found!</h2>
           <p className="text-stone-400 text-xs max-w-sm">
-            {userData?.dietPreference === "veg"
-              ? `No vegetarian reels available in ${currentCity || "your area"}. Try switching to "All" reels.`
-              : `No food reels uploaded in ${currentCity || "your city"} yet. Check back soon!`}
+            No food reels uploaded in {currentCity || "your city"} yet. Check back soon!
           </p>
-          {userData?.dietPreference === "veg" && (
-            <button
-              onClick={() => handleToggleDiet("all")}
-              className="bg-[#ff5200] text-white px-5 py-2 rounded-xl font-bold text-xs"
-            >
-              Show All Reels 🍕
-            </button>
-          )}
           {userData?.role === "owner" && (
             <button
               onClick={() => navigate("/owner/reels")}
@@ -655,6 +651,7 @@ const Reels = () => {
               reel={reel}
               currentUser={userData}
               onSkip={handleSkip}
+              onImpression={handleImpression}
             />
           ))}
 

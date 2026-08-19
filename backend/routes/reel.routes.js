@@ -8,6 +8,7 @@ import {
   getOwnerReels,
   toggleLikeReel,
   deleteReel,
+  recordImpressions,
 } from "../controllers/reel.controllers.js";
 
 import { logReelInteraction } from "../controllers/reelInteraction.controllers.js";
@@ -29,6 +30,7 @@ reelRouter.post(
   ]),
   createReel
 );
+reelRouter.post("/impressions", isAuth, recordImpressions);
 reelRouter.patch("/:id/like", isAuth, toggleLikeReel);
 reelRouter.post("/:id/interaction", isAuth, logReelInteraction);
 reelRouter.delete("/:id", isAuth, isOwner, deleteReel);
