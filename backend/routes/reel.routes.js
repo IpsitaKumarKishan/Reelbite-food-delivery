@@ -9,6 +9,7 @@ import {
   toggleLikeReel,
   deleteReel,
   recordImpressions,
+  getLikedReels,
 } from "../controllers/reel.controllers.js";
 
 import { logReelInteraction } from "../controllers/reelInteraction.controllers.js";
@@ -17,6 +18,7 @@ const reelRouter = express.Router();
 
 // Public / Authenticated read routes
 reelRouter.get("/", getAllReels);
+reelRouter.get("/liked", isAuth, getLikedReels);
 reelRouter.get("/owner/:ownerId", getOwnerReels);
 
 // Protected routes (support uploading video + optional dish image)

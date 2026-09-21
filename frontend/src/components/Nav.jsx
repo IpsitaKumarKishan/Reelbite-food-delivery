@@ -1,15 +1,18 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { FaLocationDot } from "react-icons/fa6";
+import { FaLocationDot, FaPlus, FaFilm, FaUtensils, FaMotorcycle, FaStore, FaHeart, FaGear } from "react-icons/fa6";
 import { IoIosSearch } from "react-icons/io";
 import { FiShoppingCart } from "react-icons/fi";
 import { useDispatch, useSelector } from 'react-redux';
 import { RxCross2 } from "react-icons/rx";
 import axios from 'axios';
 import { serverUrl } from '../App';
-import { setSearchItems, setUserData, updateUserDietPreference } from '../redux/userSlice';
-import { FaPlus, FaFilm, FaUtensils, FaMotorcycle, FaStore } from "react-icons/fa6";
+import { setSearchItems, setUserData } from '../redux/userSlice';
 import { TbReceipt2 } from "react-icons/tb";
 import { useNavigate } from 'react-router-dom';
+
+import CuisinePreferencesModal from './modals/CuisinePreferencesModal';
+import ProfileSettingsModal from './modals/ProfileSettingsModal';
+import SavedAddressesModal from './modals/SavedAddressesModal';
 
 function Nav() {
     const { userData, currentCity, cartItems } = useSelector(state => state.user);
@@ -17,6 +20,9 @@ function Nav() {
     const [showInfo, setShowInfo] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
     const [query, setQuery] = useState("");
+    const [showCuisineModal, setShowCuisineModal] = useState(false);
+    const [showProfileModal, setShowProfileModal] = useState(false);
+    const [showAddressesModal, setShowAddressesModal] = useState(false);
     const dropdownRef = useRef(null);
     const dispatch = useDispatch();
     const navigate = useNavigate();
@@ -59,6 +65,7 @@ function Nav() {
     }, []);
 
     return (
+        <>
         <header className='w-full h-[70px] sm:h-[80px] flex items-center justify-between px-3 sm:px-6 lg:px-12 fixed top-0 z-[9999] bg-[#fffcf7]/95 backdrop-blur-md border-b border-amber-900/10 shadow-sm'>
 
             {/* Mobile Search Overlay */}
@@ -218,95 +225,134 @@ function Nav() {
                         </div>
 
                         {showInfo && (
-                            <div className='absolute top-11 right-0 w-52 bg-white border border-stone-200 shadow-2xl rounded-2xl p-4 flex flex-col gap-2.5 z-[9999] animate-in fade-in slide-in-from-top-2'>
-                                <div className='border-b border-stone-100 pb-2'>
-                                    <div className='text-xs sm:text-sm font-extrabold text-stone-900 truncate'>{userData.fullName}</div>
-                                    <div className='text-[10px] font-bold text-[#ff5200] capitalize uppercase tracking-wider mt-0.5'>
-                                        Role: {userData.role}
+                            <div className='absolute top-12 right-0 w-64 bg-white border border-stone-200/90 shadow-2xl rounded-3xl p-3 flex flex-col gap-1 z-[9999] animate-in fade-in slide-in-from-top-2'>
+                                {/* User Info Header */}
+                                <div className='p-2 rounded-2xl bg-stone-50 border border-stone-100 flex items-center gap-3'>
+                                    <div className='w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-tr from-[#ff5200] to-amber-500 text-white text-sm font-black shadow-sm shrink-0'>
+                                        {userData?.fullName?.slice(0, 1).toUpperCase()}
+                                    </div>
+                                    <div className='min-w-0 flex-1'>
+                                        <div className='text-xs font-black text-stone-900 truncate'>{userData.fullName}</div>
+                                        <div className='text-[11px] text-stone-400 truncate'>{userData.email}</div>
+                                        <span className='inline-block text-[9px] font-black text-[#ff5200] bg-[#ff5200]/10 px-2 py-0.5 rounded-full uppercase tracking-wider mt-0.5'>
+                                            {userData.role}
+                                        </span>
                                     </div>
                                 </div>
 
-                                <div
-                                    className='text-xs font-bold text-stone-700 hover:text-[#ff5200] cursor-pointer flex items-center gap-2 py-1'
-                                    onClick={() => { setShowInfo(false); navigate("/reels"); }}
-                                >
-                                    <FaFilm className="text-[#ff5200]" />
-                                    <span>Food Reels Feed</span>
+                                {/* Section: Management & Orders */}
+                                <div className='pt-1.5 space-y-0.5'>
+                                    {userData.role === "owner" && (
+                                        <>
+                                            <div
+                                                className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
+                                                onClick={() => { setShowInfo(false); navigate("/owner/reels"); }}
+                                            >
+                                                <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                                    <FaFilm size={12} />
+                                                </div>
+                                                <span>Manage Reels</span>
+                                            </div>
+                                            <div
+                                                className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
+                                                onClick={() => { setShowInfo(false); navigate("/create-edit-shop"); }}
+                                            >
+                                                <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                                    <FaStore size={12} />
+                                                </div>
+                                                <span>Restaurant Shop</span>
+                                            </div>
+                                            <div
+                                                className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
+                                                onClick={() => { setShowInfo(false); navigate("/my-orders"); }}
+                                            >
+                                                <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                                    <TbReceipt2 size={14} />
+                                                </div>
+                                                <span>Restaurant Orders</span>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {userData.role === "user" && (
+                                        <div
+                                            className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
+                                            onClick={() => { setShowInfo(false); navigate("/my-orders"); }}
+                                        >
+                                            <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                                <TbReceipt2 size={14} />
+                                            </div>
+                                            <span>My Orders</span>
+                                        </div>
+                                    )}
+
+                                    {userData.role === "deliveryBoy" && (
+                                        <div
+                                            className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
+                                            onClick={() => { setShowInfo(false); navigate("/my-orders"); }}
+                                        >
+                                            <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                                <TbReceipt2 size={14} />
+                                            </div>
+                                            <span>My Deliveries</span>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {userData.role === "owner" && (
-                                    <>
+                                {/* Section: Personalization & Preferences */}
+                                {userData.role !== "deliveryBoy" && (
+                                    <div className='border-t border-stone-100 pt-1.5 space-y-0.5'>
                                         <div
-                                            className='text-xs font-bold text-stone-700 hover:text-[#ff5200] cursor-pointer flex items-center gap-2 py-1'
-                                            onClick={() => { setShowInfo(false); navigate("/owner/reels"); }}
+                                            className='text-xs font-bold text-stone-700 hover:text-red-500 hover:bg-red-50/50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
+                                            onClick={() => { setShowInfo(false); navigate("/liked-reels"); }}
                                         >
-                                            <FaFilm className="text-[#ff5200]" />
-                                            <span>Manage Reels</span>
+                                            <div className='w-7 h-7 rounded-xl bg-red-50 group-hover:bg-red-500 group-hover:text-white text-red-500 flex items-center justify-center transition shrink-0'>
+                                                <FaHeart size={12} />
+                                            </div>
+                                            <span>Liked Reels</span>
                                         </div>
+
                                         <div
-                                            className='text-xs font-bold text-stone-700 hover:text-[#ff5200] cursor-pointer flex items-center gap-2 py-1'
-                                            onClick={() => { setShowInfo(false); navigate("/create-edit-shop"); }}
+                                            className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
+                                            onClick={() => { setShowInfo(false); setShowCuisineModal(true); }}
                                         >
-                                            <FaStore className="text-[#ff5200]" />
-                                            <span>My Restaurant Shop</span>
+                                            <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                                <FaUtensils size={12} />
+                                            </div>
+                                            <span>Food Preferences</span>
                                         </div>
-                                    </>
+
+                                        <div
+                                            className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
+                                            onClick={() => { setShowInfo(false); setShowAddressesModal(true); }}
+                                        >
+                                            <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                                <FaLocationDot size={12} />
+                                            </div>
+                                            <span>Saved Addresses</span>
+                                        </div>
+                                    </div>
                                 )}
 
-                                {userData.role === "user" && (
+                                {/* Section: Account & Logout */}
+                                <div className='border-t border-stone-100 pt-1.5 space-y-0.5'>
                                     <div
-                                        className='text-xs font-bold text-stone-700 hover:text-[#ff5200] cursor-pointer flex items-center gap-2 py-1'
-                                        onClick={() => { setShowInfo(false); navigate("/my-orders"); }}
+                                        className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
+                                        onClick={() => { setShowInfo(false); setShowProfileModal(true); }}
                                     >
-                                        <TbReceipt2 className="text-[#ff5200]" />
-                                        <span>My Orders</span>
+                                        <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                            <FaGear size={12} />
+                                        </div>
+                                        <span>Account Settings</span>
                                     </div>
-                                )}
 
-                                <div className='border-t border-stone-100 pt-2 space-y-1'>
-                                    <div className='text-[10px] font-bold text-stone-500 uppercase tracking-wider'>Reel Feed Diet</div>
-                                    <div className='grid grid-cols-2 gap-1 text-[11px] font-bold'>
-                                        <button
-                                            type="button"
-                                            onClick={async () => {
-                                                try {
-                                                    await axios.put(`${serverUrl}/api/user/diet-preference`, { dietPreference: "all" }, { withCredentials: true });
-                                                    dispatch(updateUserDietPreference("all"));
-                                                } catch (e) {}
-                                            }}
-                                            className={`py-1 px-1.5 rounded-lg border transition ${
-                                                (userData?.dietPreference || "all") === "all"
-                                                    ? "bg-[#ff5200] text-white border-[#ff5200]"
-                                                    : "bg-stone-50 text-stone-600 border-stone-200"
-                                            }`}
-                                        >
-                                            Show All 🍕
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={async () => {
-                                                try {
-                                                    await axios.put(`${serverUrl}/api/user/diet-preference`, { dietPreference: "veg" }, { withCredentials: true });
-                                                    dispatch(updateUserDietPreference("veg"));
-                                                } catch (e) {}
-                                            }}
-                                            className={`py-1 px-1.5 rounded-lg border transition ${
-                                                userData?.dietPreference === "veg"
-                                                    ? "bg-emerald-600 text-white border-emerald-600"
-                                                    : "bg-stone-50 text-stone-600 border-stone-200"
-                                            }`}
-                                        >
-                                            Veg Only 🌱
-                                        </button>
+                                    <div
+                                        className='text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center justify-between transition mt-0.5'
+                                        onClick={() => { setShowInfo(false); handleLogOut(); }}
+                                    >
+                                        <span>Log Out</span>
+                                        <span>➔</span>
                                     </div>
-                                </div>
-
-                                <div
-                                    className='text-xs font-bold text-red-600 hover:text-red-700 cursor-pointer pt-2 border-t border-stone-100 flex items-center justify-between'
-                                    onClick={() => { setShowInfo(false); handleLogOut(); }}
-                                >
-                                    <span>Log Out</span>
-                                    <span>➔</span>
                                 </div>
                             </div>
                         )}
@@ -323,6 +369,21 @@ function Nav() {
                 )}
             </div>
         </header>
+
+        {/* Modals rendered outside header container */}
+        <CuisinePreferencesModal
+            isOpen={showCuisineModal}
+            onClose={() => setShowCuisineModal(false)}
+        />
+        <ProfileSettingsModal
+            isOpen={showProfileModal}
+            onClose={() => setShowProfileModal(false)}
+        />
+        <SavedAddressesModal
+            isOpen={showAddressesModal}
+            onClose={() => setShowAddressesModal(false)}
+        />
+        </>
     );
 }
 

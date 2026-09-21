@@ -546,3 +546,19 @@ export const recordImpressions = async (req, res) => {
     return res.status(500).json({ message: "Failed to record impressions", error: error.message });
   }
 };
+
+export const getLikedReels = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const reels = await Reel.find({ likes: userId })
+      .populate("owner", "fullName email")
+      .populate("shop", "name city image")
+      .populate("foodItem", "name price image category foodType rating shop")
+      .sort({ updatedAt: -1 });
+
+    return res.status(200).json(reels || []);
+  } catch (error) {
+    console.error("Get liked reels error:", error);
+    return res.status(500).json({ message: "Failed to fetch liked reels", error: error.message });
+  }
+};

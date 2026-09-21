@@ -1,5 +1,6 @@
 import User from "../models/user.model.js"
 import Item from "../models/item.model.js"
+import bcrypt from "bcryptjs"
 
 const formatUserCart = (cartArray) => {
   if (!cartArray) return [];
@@ -213,3 +214,133 @@ export const getDistinctCategories = async (req, res) => {
     return res.status(500).json({ message: `Get categories error ${error}` })
   }
 }
+
+/**
+ * PUT /api/user/profile
+ * Updates user full name, mobile number, and optionally updates password
+ */
+export const updateProfile = async (req, res) => {
+  try {
+    const { fullName, mobile, currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (fullName && fullName.trim()) user.fullName = fullName.trim();
+    if (mobile && mobile.trim()) {
+      if (mobile.trim().length < 10) {
+        return res.status(400).json({ message: "Mobile number must be at least 10 digits." });
+      }
+      user.mobile = mobile.trim();
+    }
+
+    if (newPassword) {
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "New password must be at least 6 characters." });
+      }
+
+      if (user.password) {
+        if (!currentPassword) {
+          return res.status(400).json({ message: "Current password is required to set a new password." });
+        }
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+          return res.status(400).json({ message: "Current password is incorrect." });
+        }
+      }
+
+      user.password = await bcrypt.hash(newPassword, 10);
+    }
+
+    await user.save();
+    await user.populate("cart.item");
+
+    const userObj = user.toObject();
+    userObj.cart = formatUserCart(user.cart);
+    return res.status(200).json({ message: "Profile updated successfully", user: userObj });
+  } catch (error) {
+    return res.status(500).json({ message: `Update profile error ${error.message || error}` });
+  }
+};
+
+/**
+ * POST /api/user/addresses
+ * Adds a new delivery address
+ */
+export const addAddress = async (req, res) => {
+  try {
+    const { label, street, city, state, isDefault } = req.body;
+    if (!street || !street.trim()) {
+      return res.status(400).json({ message: "Street address is required." });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (!user.addresses) user.addresses = [];
+
+    const shouldBeDefault = isDefault || user.addresses.length === 0;
+    if (shouldBeDefault) {
+      user.addresses.forEach((a) => { a.isDefault = false; });
+    }
+
+    user.addresses.push({
+      label: label || "Home",
+      street: street.trim(),
+      city: city || "",
+      state: state || "",
+      isDefault: shouldBeDefault,
+    });
+
+    await user.save();
+    return res.status(200).json({ message: "Address added successfully", addresses: user.addresses });
+  } catch (error) {
+    return res.status(500).json({ message: `Add address error ${error.message || error}` });
+  }
+};
+
+/**
+ * DELETE /api/user/addresses/:addressId
+ * Removes a saved address
+ */
+export const deleteAddress = async (req, res) => {
+  try {
+    const { addressId } = req.params;
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const wasDefault = user.addresses.find((a) => a._id.toString() === addressId)?.isDefault;
+    user.addresses = user.addresses.filter((a) => a._id.toString() !== addressId);
+
+    if (wasDefault && user.addresses.length > 0) {
+      user.addresses[0].isDefault = true;
+    }
+
+    await user.save();
+    return res.status(200).json({ message: "Address removed", addresses: user.addresses });
+  } catch (error) {
+    return res.status(500).json({ message: `Delete address error ${error.message || error}` });
+  }
+};
+
+/**
+ * PATCH /api/user/addresses/:addressId/default
+ * Sets an address as the default delivery address
+ */
+export const setDefaultAddress = async (req, res) => {
+  try {
+    const { addressId } = req.params;
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    user.addresses.forEach((a) => {
+      a.isDefault = a._id.toString() === addressId;
+    });
+
+    await user.save();
+    return res.status(200).json({ message: "Default address updated", addresses: user.addresses });
+  } catch (error) {
+    return res.status(500).json({ message: `Set default address error ${error.message || error}` });
+  }
+};

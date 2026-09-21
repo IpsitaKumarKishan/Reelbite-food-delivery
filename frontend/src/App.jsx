@@ -24,6 +24,7 @@ import TrackOrderPage from './pages/TrackOrderPage'
 import Shop from './pages/Shop'
 import Reels from './pages/Reels'
 import OwnerReels from './pages/OwnerReels'
+import LikedReels from './pages/LikedReels'
 import { useEffect } from 'react'
 import { io } from 'socket.io-client'
 import { setSocket } from './redux/userSlice'
@@ -64,6 +65,7 @@ function App() {
     <Route path='/' element={userData?<Home/>:<LandingPage/>}/>
     <Route path='/landing' element={<LandingPage/>}/>
     <Route path='/reels' element={<Reels/>}/>
+    <Route path='/liked-reels' element={userData?<LikedReels/>:<Navigate to={"/signin"}/>}/>
     <Route path='/owner/reels' element={userData && userData.role === "owner" ? <OwnerReels/> : <Navigate to={"/"}/>}/>
     <Route path='/create-edit-shop' element={userData?<CreateEditShop/>:<Navigate to={"/signin"}/>}/>
     <Route path='/add-item' element={userData?<AddItem/>:<Navigate to={"/signin"}/>}/>

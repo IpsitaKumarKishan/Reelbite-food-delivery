@@ -62,7 +62,16 @@ coordinates:{type:[Number],default:[0,0]}
    preferredCuisines: {
      type: [String],
      default: []
-   }
+   },
+   addresses: [
+     {
+       label: { type: String, default: "Home" },
+       street: { type: String, required: true },
+       city: { type: String },
+       state: { type: String },
+       isDefault: { type: Boolean, default: false },
+     }
+   ]
   
 }, { timestamps: true })
 
