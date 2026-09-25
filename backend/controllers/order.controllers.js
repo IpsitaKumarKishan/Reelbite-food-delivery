@@ -529,7 +529,8 @@ export const getCurrentOrder = async (req, res) => {
             shopOrder,
             deliveryAddress: assignment.order.deliveryAddress,
             deliveryBoyLocation,
-            customerLocation
+            customerLocation,
+            hasActiveOtp: Boolean(shopOrder.deliveryOtp && shopOrder.otpExpires && new Date(shopOrder.otpExpires) > new Date())
         })
 
 

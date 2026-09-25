@@ -18,7 +18,6 @@ import { FaSearch, FaShoppingBag } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart, setCartItems, updateQuantity } from "../redux/userSlice";
 import Nav from "../components/Nav";
-import MobileBottomTab from "../components/MobileBottomTab";
 
 const SwiggyDishItem = ({ item, shopId }) => {
   const dispatch = useDispatch();
@@ -268,8 +267,6 @@ function Shop() {
           )}
         </div>
       </main>
-
-      <MobileBottomTab />
     </div>
   );
 }

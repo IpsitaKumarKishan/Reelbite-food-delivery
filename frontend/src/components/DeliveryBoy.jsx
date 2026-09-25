@@ -7,6 +7,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import DeliveryBoyTracking from './DeliveryBoyTracking'
 import { ClipLoader } from 'react-spinners'
 import { useSocket } from '../context/SocketContext'
+import { toast } from 'react-hot-toast'
 
 function DeliveryBoy() {
   const { userData } = useSelector(state => state.user)
@@ -62,6 +63,13 @@ function DeliveryBoy() {
     try {
       const result = await axios.get(`${serverUrl}/api/order/get-current-order`, { withCredentials: true })
       setCurrentOrder(result.data)
+      if (
+        result.data?.hasActiveOtp ||
+        result.data?.shopOrder?.deliveryOtp ||
+        (result.data?.shopOrder?.otpExpires && new Date(result.data.shopOrder.otpExpires) > new Date())
+      ) {
+        setShowOtpBox(true)
+      }
     } catch (error) {
       console.log(error)
     }
@@ -88,6 +96,10 @@ function DeliveryBoy() {
   }, [socket])
 
   const sendOtp = async () => {
+    if (!currentOrder?._id || !currentOrder?.shopOrder?._id) {
+      toast.error("Active order details missing")
+      return
+    }
     setLoading(true)
     setMessage("")
     try {
@@ -97,17 +109,27 @@ function DeliveryBoy() {
       }, { withCredentials: true })
       setLoading(false)
       setShowOtpBox(true)
-      console.log(result.data)
+      const successMsg = result.data?.message || "OTP sent successfully to customer!"
+      setMessage(successMsg)
+      toast.success(successMsg)
     } catch (error) {
-      console.log(error)
+      console.error("sendOtp error:", error)
       setLoading(false)
-      setMessage(error.response?.data?.message || "Failed to send OTP")
+      const errMsg = error.response?.data?.message || "Failed to send OTP. Please try again."
+      setMessage(errMsg)
+      toast.error(errMsg)
+      // If error indicates OTP already sent or rate limited, reveal the OTP box so the driver can still enter customer's code
+      if (errMsg.toLowerCase().includes("too many") || errMsg.toLowerCase().includes("already") || errMsg.toLowerCase().includes("wait")) {
+        setShowOtpBox(true)
+      }
     }
   }
 
   const verifyOtp = async () => {
-    if (!otp) {
-      setMessage("Please enter the 4-digit OTP from customer")
+    if (!otp || otp.trim().length !== 4) {
+      const err = "Please enter the 4-digit OTP received from customer"
+      setMessage(err)
+      toast.error(err)
       return
     }
     setMessage("")
@@ -120,14 +142,18 @@ function DeliveryBoy() {
       }, { withCredentials: true })
 
       setVerifying(false)
-      setMessage(result.data.message || "Order Delivered Successfully! 🎉")
+      const successMsg = result.data.message || "Order Delivered Successfully! 🎉"
+      setMessage(successMsg)
+      toast.success(successMsg)
       setTimeout(() => {
         location.reload()
       }, 1200)
     } catch (error) {
       console.error("verifyOtp error:", error)
       setVerifying(false)
-      setMessage(error.response?.data?.message || "Invalid or Expired OTP")
+      const errMsg = error.response?.data?.message || "Invalid or Expired OTP. Please check with customer."
+      setMessage(errMsg)
+      toast.error(errMsg)
     }
   }
 
@@ -227,30 +253,69 @@ function DeliveryBoy() {
               }
             }} />
 
+            {/* Feedback message when not in OTP box */}
+            {message && !showOtpBox && (
+              <p className="mt-3 text-xs font-bold text-center p-2.5 rounded-xl border bg-amber-50 text-amber-800 border-amber-200">
+                {message}
+              </p>
+            )}
+
             {!showOtpBox ? (
-              <button
-                className='mt-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2'
-                onClick={sendOtp}
-                disabled={loading}
-              >
-                {loading ? <ClipLoader size={18} color='white' /> : "Mark As Delivered (Send OTP)"}
-              </button>
+              <div className="mt-4 space-y-2">
+                <button
+                  className='w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75'
+                  onClick={sendOtp}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <ClipLoader size={18} color='white' />
+                      <span>Sending OTP to Customer...</span>
+                    </>
+                  ) : (
+                    "Mark As Delivered (Send OTP)"
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowOtpBox(true)}
+                  className="w-full text-center text-xs font-bold text-stone-500 hover:text-[#ff5200] py-1 cursor-pointer transition"
+                >
+                  Already sent OTP? Click here to enter OTP
+                </button>
+              </div>
             ) : (
-              <div className='mt-4 p-4 border border-stone-200 rounded-2xl bg-stone-50 space-y-3'>
-                <p className='text-xs sm:text-sm font-bold text-stone-800'>
-                  Enter OTP received from customer (<span className='text-[#ff5200]'>{currentOrder?.user?.fullName}</span>)
+              <div className='mt-4 p-4 border border-stone-200 rounded-2xl bg-stone-50 space-y-3.5 shadow-inner'>
+                <div className="flex items-center justify-between border-b border-stone-200 pb-2">
+                  <p className='text-xs sm:text-sm font-bold text-stone-800'>
+                    Enter OTP from <span className='text-[#ff5200]'>{currentOrder?.user?.fullName || "customer"}</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowOtpBox(false)}
+                    className="text-[11px] text-stone-400 hover:text-stone-700 font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-stone-500">
+                  Ask the customer for the 4-digit verification code sent to their registered email.
                 </p>
 
                 <input
                   type="text"
-                  className='w-full border border-stone-300 px-4 py-2.5 rounded-xl text-sm font-bold text-stone-800 focus:outline-none focus:border-[#ff5200] focus:ring-1 focus:ring-[#ff5200]'
-                  placeholder='Enter 4-digit OTP'
-                  onChange={(e) => setOtp(e.target.value)}
+                  maxLength={4}
+                  className='w-full border border-stone-300 bg-white px-4 py-3 rounded-xl text-center text-lg tracking-widest font-black text-stone-900 focus:outline-none focus:border-[#ff5200] focus:ring-2 focus:ring-[#ff5200]/20'
+                  placeholder='• • • •'
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                   value={otp}
+                  autoFocus
                 />
 
                 {message && (
-                  <p className={`text-xs font-bold text-center p-2 rounded-xl border ${
+                  <p className={`text-xs font-bold text-center p-2.5 rounded-xl border ${
                     message.includes("Successfully") || message.includes("Delivered")
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                       : "bg-red-50 text-red-600 border-red-200"
@@ -260,12 +325,23 @@ function DeliveryBoy() {
                 )}
 
                 <button
-                  className="w-full bg-[#ff5200] hover:bg-[#c2410c] text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider shadow transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full bg-[#ff5200] hover:bg-[#c2410c] text-white py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                   onClick={verifyOtp}
-                  disabled={verifying || !otp}
+                  disabled={verifying || otp.trim().length !== 4}
                 >
                   {verifying ? <ClipLoader size={16} color="white" /> : "Submit OTP & Complete Order"}
                 </button>
+
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={sendOtp}
+                    disabled={loading}
+                    className="text-xs font-bold text-stone-500 hover:text-[#ff5200] transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {loading ? "Resending OTP..." : "Didn't receive code? Resend OTP"}
+                  </button>
+                </div>
               </div>
             )}
           </div>

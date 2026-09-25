@@ -27,6 +27,7 @@ import OwnerReels from './pages/OwnerReels'
 import LikedReels from './pages/LikedReels'
 import NotFound from './pages/NotFound'
 import { Toaster } from 'react-hot-toast'
+import MobileBottomTab from './components/MobileBottomTab'
 
 export const serverUrl = (import.meta.env.VITE_SERVER_URL !== undefined && import.meta.env.VITE_SERVER_URL !== "")
   ? import.meta.env.VITE_SERVER_URL
@@ -70,6 +71,7 @@ function App() {
         <Route path='/shop/:shopId' element={userData ? <Shop/> : <Navigate to={"/signin"}/>}/>
         <Route path='*' element={<NotFound />}/>
       </Routes>
+      <MobileBottomTab />
     </>
   )
 }

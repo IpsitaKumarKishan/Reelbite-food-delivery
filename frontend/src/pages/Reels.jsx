@@ -388,7 +388,7 @@ const ReelCard = ({ reel, currentUser, onSkip, onImpression }) => {
       </div>
 
       {/* Bottom Details & Add to Cart Container (Inside Phone Preview) */}
-      <div className="absolute left-3.5 right-16 bottom-4 z-20 text-white space-y-2">
+      <div className="absolute left-3.5 right-16 bottom-16 sm:bottom-4 z-20 text-white space-y-2">
         {/* Shop Tag */}
         <div
           onClick={handleNavigateToShop}

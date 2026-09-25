@@ -7,7 +7,7 @@ function CartPage() {
     const navigate = useNavigate()
     const { cartItems, totalAmount } = useSelector(state => state.user)
     return (
-        <div className='min-h-screen bg-[#fff9f6] flex justify-center p-6'>
+        <div className='min-h-screen bg-[#fff9f6] flex justify-center p-6 pb-24 md:pb-6'>
             <div className='w-full max-w-[800px]'>
                 <div className='flex items-center gap-[20px] mb-6 '>
                     <div className=' z-[10] ' onClick={() => navigate("/")}>

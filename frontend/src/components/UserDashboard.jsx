@@ -9,7 +9,6 @@ import FoodCard from './FoodCard';
 import RestaurantCard from './RestaurantCard';
 import { useNavigate } from 'react-router-dom';
 import ReelTeaserStrip from './ReelTeaserStrip';
-import MobileBottomTab from './MobileBottomTab';
 
 function UserDashboard() {
   const { currentCity, shopInMyCity, itemsInMyCity, searchItems } = useSelector(state => state.user);
@@ -252,9 +251,6 @@ function UserDashboard() {
           </div>
         </section>
       </main>
-
-      {/* Mobile Bottom Tab Bar */}
-      <MobileBottomTab />
     </div>
   );
 }

@@ -62,7 +62,7 @@ function MyOrders() {
   }, [myOrders, userData]);
 
   return (
-    <div className='w-full min-h-screen bg-[#fff9f6] flex justify-center px-4 pb-16'>
+    <div className='w-full min-h-screen bg-[#fff9f6] flex justify-center px-4 pb-24 md:pb-16'>
       <div className='w-full max-w-[800px] pt-6'>
         {/* Header */}
         <div className='flex items-center justify-between mb-6 border-b border-amber-900/10 pb-4'>
