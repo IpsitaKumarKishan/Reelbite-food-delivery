@@ -75,8 +75,8 @@ function SignIn() {
       setLoading(false);
       navigate('/');
     } catch (error) {
-      console.error(error);
-      setErr(error?.response?.data?.message || 'Google Sign-In failed');
+      console.error("Google Auth Error:", error);
+      setErr(error?.response?.data?.message || (error?.code ? `${error.code}: ${error.message}` : error?.message) || 'Google Sign-In failed');
       setLoading(false);
     }
   };

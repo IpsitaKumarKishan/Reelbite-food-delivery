@@ -86,8 +86,8 @@ function SignUp() {
       setLoading(false);
       navigate('/');
     } catch (error) {
-      console.error(error);
-      setErr(error?.response?.data?.message || 'Google Sign-Up failed');
+      console.error("Google Auth Error:", error);
+      setErr(error?.response?.data?.message || (error?.code ? `${error.code}: ${error.message}` : error?.message) || 'Google Sign-Up failed');
       setLoading(false);
     }
   };
