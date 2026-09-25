@@ -100,12 +100,12 @@ socketHandler(io)
 if (fs.existsSync(frontendDistPath)) {
   app.use(express.static(frontendDistPath))
 
-  // SPA fallback for all non-API GET routes
-  app.get("*", (req, res, next) => {
-    if (req.originalUrl.startsWith("/api")) {
-      return next()
+  // SPA fallback for all non-API GET routes (Express 5 compatible)
+  app.use((req, res, next) => {
+    if (req.method === "GET" && !req.originalUrl.startsWith("/api")) {
+      return res.sendFile(path.join(frontendDistPath, "index.html"))
     }
-    res.sendFile(path.join(frontendDistPath, "index.html"))
+    next()
   })
 }
 
