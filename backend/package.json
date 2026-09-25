@@ -5,10 +5,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
     "dev": "nodemon index.js",
     "test": "node --test tests/*.test.js"
   },
-  "author": "Virtual code",
+  "author": "Ipsita Kumar Kishan",
   "license": "ISC",
   "dependencies": {
     "bcryptjs": "^3.0.2",
