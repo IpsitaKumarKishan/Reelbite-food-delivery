@@ -32,9 +32,9 @@ export const getMyShop=async (req,res) => {
         const shop=await Shop.findOne({owner:req.userId}).populate("owner").populate({
             path:"items",
             options:{sort:{updatedAt:-1}}
-        })
+        }).lean()
         if(!shop){
-            return null
+            return res.status(404).json({ message: "Shop not found. Create one first." })
         }
         return res.status(200).json(shop)
     } catch (error) {
@@ -49,12 +49,12 @@ export const getShopByCity = async (req, res) => {
         if (city && city !== "null" && city !== "undefined" && city !== "all") {
             shops = await Shop.find({
                 city: { $regex: new RegExp(city, "i") }
-            }).populate('items')
+            }).populate('items').lean()
         }
         
         // Fallback: If no shops match the specific city, return all registered shops
         if (!shops || shops.length === 0) {
-            shops = await Shop.find({}).populate('items')
+            shops = await Shop.find({}).populate('items').lean()
         }
         
         return res.status(200).json(shops)

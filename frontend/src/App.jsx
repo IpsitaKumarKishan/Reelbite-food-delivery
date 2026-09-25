@@ -4,7 +4,7 @@ import SignUp from './pages/SignUp'
 import SignIn from './pages/SignIn'
 import ForgotPassword from './pages/ForgotPassword'
 import useGetCurrentUser from './hooks/useGetCurrentUser'
-import { useDispatch, useSelector } from 'react-redux'
+import { useSelector } from 'react-redux'
 import Home from './pages/Home'
 import LandingPage from './pages/LandingPage'
 import useGetCity from './hooks/useGetCity'
@@ -25,58 +25,52 @@ import Shop from './pages/Shop'
 import Reels from './pages/Reels'
 import OwnerReels from './pages/OwnerReels'
 import LikedReels from './pages/LikedReels'
-import { useEffect } from 'react'
-import { io } from 'socket.io-client'
-import { setSocket } from './redux/userSlice'
+import NotFound from './pages/NotFound'
+import { Toaster } from 'react-hot-toast'
 
 export const serverUrl = import.meta.env.VITE_SERVER_URL !== undefined
   ? import.meta.env.VITE_SERVER_URL
   : (import.meta.env.MODE === 'production' ? "" : "http://localhost:5000");
 
-function App() {
-    const {userData}=useSelector(state=>state.user)
-    const dispatch=useDispatch()
-  useGetCurrentUser()
+function AuthenticatedDataLoader() {
   useUpdateLocation()
   useGetCity()
   useGetMyshop()
   useGetShopByCity()
   useGetItemsByCity()
   useGetMyOrders()
+  return null
+}
 
-  useEffect(()=>{
-    const socketInstance = io(serverUrl || undefined, { withCredentials: true })
-    dispatch(setSocket(socketInstance))
-    socketInstance.on('connect',()=>{
-      if(userData){
-        socketInstance.emit('identity',{userId:userData._id})
-      }
-    })
-    return ()=>{
-      socketInstance.disconnect()
-    }
-  },[userData?._id])
+function App() {
+  const { userData } = useSelector(state => state.user)
+  useGetCurrentUser()
 
   return (
-   <Routes>
-    <Route path='/signup' element={!userData?<SignUp/>:<Navigate to={"/"}/>}/>
-    <Route path='/signin' element={!userData?<SignIn/>:<Navigate to={"/"}/>}/>
-    <Route path='/forgot-password' element={!userData?<ForgotPassword/>:<Navigate to={"/"}/>}/>
-    <Route path='/' element={userData?<Home/>:<LandingPage/>}/>
-    <Route path='/landing' element={<LandingPage/>}/>
-    <Route path='/reels' element={<Reels/>}/>
-    <Route path='/liked-reels' element={userData?<LikedReels/>:<Navigate to={"/signin"}/>}/>
-    <Route path='/owner/reels' element={userData && userData.role === "owner" ? <OwnerReels/> : <Navigate to={"/"}/>}/>
-    <Route path='/create-edit-shop' element={userData?<CreateEditShop/>:<Navigate to={"/signin"}/>}/>
-    <Route path='/add-item' element={userData?<AddItem/>:<Navigate to={"/signin"}/>}/>
-    <Route path='/edit-item/:itemId' element={userData?<EditItem/>:<Navigate to={"/signin"}/>}/>
-    <Route path='/cart' element={userData?<CartPage/>:<Navigate to={"/signin"}/>}/>
-    <Route path='/checkout' element={userData?<CheckOut/>:<Navigate to={"/signin"}/>}/>
-    <Route path='/order-placed' element={userData?<OrderPlaced/>:<Navigate to={"/signin"}/>}/>
-    <Route path='/my-orders' element={userData?<MyOrders/>:<Navigate to={"/signin"}/>}/>
-    <Route path='/track-order/:orderId' element={userData?<TrackOrderPage/>:<Navigate to={"/signin"}/>}/>
-    <Route path='/shop/:shopId' element={userData?<Shop/>:<Navigate to={"/signin"}/>}/>
-   </Routes>
+    <>
+      <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
+      {userData && <AuthenticatedDataLoader />}
+      <Routes>
+        <Route path='/signup' element={!userData ? <SignUp/> : <Navigate to={"/"}/>}/>
+        <Route path='/signin' element={!userData ? <SignIn/> : <Navigate to={"/"}/>}/>
+        <Route path='/forgot-password' element={!userData ? <ForgotPassword/> : <Navigate to={"/"}/>}/>
+        <Route path='/' element={userData ? <Home/> : <LandingPage/>}/>
+        <Route path='/landing' element={<LandingPage/>}/>
+        <Route path='/reels' element={<Reels/>}/>
+        <Route path='/liked-reels' element={userData ? <LikedReels/> : <Navigate to={"/signin"}/>}/>
+        <Route path='/owner/reels' element={userData && userData.role === "owner" ? <OwnerReels/> : <Navigate to={"/"}/>}/>
+        <Route path='/create-edit-shop' element={userData ? <CreateEditShop/> : <Navigate to={"/signin"}/>}/>
+        <Route path='/add-item' element={userData ? <AddItem/> : <Navigate to={"/signin"}/>}/>
+        <Route path='/edit-item/:itemId' element={userData ? <EditItem/> : <Navigate to={"/signin"}/>}/>
+        <Route path='/cart' element={userData ? <CartPage/> : <Navigate to={"/signin"}/>}/>
+        <Route path='/checkout' element={userData ? <CheckOut/> : <Navigate to={"/signin"}/>}/>
+        <Route path='/order-placed' element={userData ? <OrderPlaced/> : <Navigate to={"/signin"}/>}/>
+        <Route path='/my-orders' element={userData ? <MyOrders/> : <Navigate to={"/signin"}/>}/>
+        <Route path='/track-order/:orderId' element={userData ? <TrackOrderPage/> : <Navigate to={"/signin"}/>}/>
+        <Route path='/shop/:shopId' element={userData ? <Shop/> : <Navigate to={"/signin"}/>}/>
+        <Route path='*' element={<NotFound />}/>
+      </Routes>
+    </>
   )
 }
 

@@ -13,11 +13,17 @@ const deliveryAssignmentSchema = new mongoose.Schema({
          type: mongoose.Schema.Types.ObjectId,
          required:true
     },
+    broadcastedTo:[
+        {
+         type: mongoose.Schema.Types.ObjectId,
+         ref:"User"
+        }
+    ],
     brodcastedTo:[
         {
          type: mongoose.Schema.Types.ObjectId,
          ref:"User"
-    }
+        }
     ],
     assignedTo:{
         type: mongoose.Schema.Types.ObjectId,
@@ -26,10 +32,9 @@ const deliveryAssignmentSchema = new mongoose.Schema({
     },
     status:{
         type:String,
-        enum:["brodcasted","assigned","completed"],
-        default:"brodcasted"
-    }
-    ,
+        enum:["broadcasted","brodcasted","assigned","completed"],
+        default:"broadcasted"
+    },
     acceptedAt:Date
 }, { timestamps: true })
 

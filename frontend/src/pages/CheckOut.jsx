@@ -16,12 +16,13 @@ import { serverUrl } from '../App';
 import { addMyOrder, clearCart, setTotalAmount } from '../redux/userSlice';
 
 function RecenterMap({ location }) {
-  if (location.lat && location.lon) {
-    const map = useMap()
-    map.setView([location.lat, location.lon], 16, { animate: true })
-  }
+  const map = useMap()
+  useEffect(() => {
+    if (location?.lat && location?.lon) {
+      map.setView([location.lat, location.lon], 16, { animate: true })
+    }
+  }, [location, map])
   return null
-
 }
 
 function CheckOut() {

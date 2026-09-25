@@ -5,12 +5,13 @@ import Shop from "../models/shop.model.js";
 export const getOwnerEarnings = async (req, res) => {
   try {
     const ownerId = req.userId;
-    const shop = await Shop.findOne({ owner: ownerId });
+    const shop = await Shop.findOne({ owner: ownerId }).lean();
     
     // Find all orders containing a shopOrder for this owner
     const orders = await Order.find({ "shopOrders.owner": ownerId })
       .sort({ createdAt: -1 })
-      .populate("shopOrders.shopOrderItems.item", "name price");
+      .populate("shopOrders.shopOrderItems.item", "name price")
+      .lean();
 
     let totalUnsettledPayout = 0;
     let totalSettledPayout = 0;
@@ -50,7 +51,7 @@ export const getOwnerEarnings = async (req, res) => {
       });
     });
 
-    const payouts = await Payout.find({ recipientId: ownerId }).sort({ createdAt: -1 });
+    const payouts = await Payout.find({ recipientId: ownerId }).sort({ createdAt: -1 }).lean();
 
     return res.status(200).json({
       shop,

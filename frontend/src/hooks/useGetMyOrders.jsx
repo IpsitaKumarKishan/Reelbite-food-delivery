@@ -1,5 +1,6 @@
 import axios from 'axios'
 import React, { useEffect } from 'react'
+import toast from 'react-hot-toast'
 import { serverUrl } from '../App'
 import { useDispatch, useSelector } from 'react-redux'
 import { setMyOrders, setUserData } from '../redux/userSlice'
@@ -18,6 +19,7 @@ function useGetMyOrders() {
 
     } catch (error) {
         console.log(error)
+        toast.error("Failed to load your orders")
     }
 }
   fetchOrders()

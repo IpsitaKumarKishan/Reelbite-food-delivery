@@ -5,7 +5,6 @@ import User from "../models/user.model.js"
 import { sendDeliveryOtpMail } from "../utils/mail.js"
 import RazorPay from "razorpay"
 import dotenv from "dotenv"
-import { count } from "console"
 import { computeOrderSplit } from "../utils/orderSplit.js"
 
 dotenv.config()
@@ -38,7 +37,7 @@ export const placeOrder = async (req, res) => {
         const shopOrders = await Promise.all(Object.keys(groupItemsByShop).map(async (shopId) => {
             const shop = await Shop.findById(shopId).populate("owner")
             if (!shop) {
-                return res.status(400).json({ message: "shop not found" })
+                throw new Error(`Shop ${shopId} not found`)
             }
             shopCommissionRates[shop._id.toString()] = shop.commissionRate || 20;
             const items = groupItemsByShop[shopId]
@@ -142,7 +141,8 @@ export const placeOrder = async (req, res) => {
 
         return res.status(201).json(newOrder)
     } catch (error) {
-        return res.status(500).json({ message: `place order error ${error}` })
+        const isClientError = error.message && error.message.includes("not found");
+        return res.status(isClientError ? 400 : 500).json({ message: `place order error: ${error.message || error}` })
     }
 }
 
@@ -212,38 +212,72 @@ export const verifyPayment = async (req, res) => {
 export const getMyOrders = async (req, res) => {
     try {
         const user = await User.findById(req.userId)
+        if (!user) {
+            return res.status(404).json({ message: "User not found" })
+        }
+        const page = req.query.page ? parseInt(req.query.page) : null
+        const limit = req.query.limit ? parseInt(req.query.limit) : null
+        const skip = page && limit ? (page - 1) * limit : 0
+
         if (user.role == "user") {
-            const orders = await Order.find({ user: req.userId })
+            let query = Order.find({ user: req.userId })
                 .sort({ createdAt: -1 })
                 .populate("shopOrders.shop", "name")
                 .populate("shopOrders.owner", "name email mobile")
                 .populate("shopOrders.shopOrderItems.item", "name image price")
+                .lean()
 
+            if (page && limit) {
+                const [orders, total] = await Promise.all([
+                    query.skip(skip).limit(limit),
+                    Order.countDocuments({ user: req.userId })
+                ])
+                return res.status(200).json({ data: orders, page, totalPages: Math.ceil(total / limit), total })
+            }
+
+            const orders = await query
             return res.status(200).json(orders)
         } else if (user.role == "owner") {
-            const orders = await Order.find({ "shopOrders.owner": req.userId })
+            let query = Order.find({ "shopOrders.owner": req.userId })
                 .sort({ createdAt: -1 })
                 .populate("shopOrders.shop", "name")
                 .populate("user")
                 .populate("shopOrders.shopOrderItems.item", "name image price")
                 .populate("shopOrders.assignedDeliveryBoy", "fullName mobile")
+                .lean()
 
+            if (page && limit) {
+                const [orders, total] = await Promise.all([
+                    query.skip(skip).limit(limit),
+                    Order.countDocuments({ "shopOrders.owner": req.userId })
+                ])
+                const filteredOrders = orders.map((order => ({
+                    _id: order._id,
+                    paymentMethod: order.paymentMethod,
+                    user: order.user,
+                    shopOrders: order.shopOrders?.find(o => o.owner?._id?.toString() == req.userId || o.owner?.toString() == req.userId),
+                    createdAt: order.createdAt,
+                    deliveryAddress: order.deliveryAddress,
+                    payment: order.payment
+                })))
+                return res.status(200).json({ data: filteredOrders, page, totalPages: Math.ceil(total / limit), total })
+            }
 
-
+            const orders = await query
             const filteredOrders = orders.map((order => ({
                 _id: order._id,
                 paymentMethod: order.paymentMethod,
                 user: order.user,
-                shopOrders: order.shopOrders.find(o => o.owner._id == req.userId),
+                shopOrders: order.shopOrders?.find(o => o.owner?._id?.toString() == req.userId || o.owner?.toString() == req.userId),
                 createdAt: order.createdAt,
                 deliveryAddress: order.deliveryAddress,
                 payment: order.payment
             })))
 
-
             return res.status(200).json(filteredOrders)
         }
 
+        return res.status(200).json([])
     } catch (error) {
         return res.status(500).json({ message: `get User order error ${error}` })
     }
@@ -277,7 +311,7 @@ export const updateOrderStatus = async (req, res) => {
             const nearByIds = nearByDeliveryBoys.map(b => b._id)
             const busyIds = await DeliveryAssignment.find({
                 assignedTo: { $in: nearByIds },
-                status: { $nin: ["brodcasted", "completed"] }
+                status: { $nin: ["broadcasted", "brodcasted", "completed"] }
 
             }).distinct("assignedTo")
 
@@ -297,8 +331,9 @@ export const updateOrderStatus = async (req, res) => {
                 order: order?._id,
                 shop: shopOrder.shop,
                 shopOrderId: shopOrder?._id,
+                broadcastedTo: candidates,
                 brodcastedTo: candidates,
-                status: "brodcasted"
+                status: "broadcasted"
             })
 
             shopOrder.assignedDeliveryBoy = deliveryAssignment.assignedTo
@@ -379,8 +414,11 @@ export const getDeliveryBoyAssignment = async (req, res) => {
     try {
         const deliveryBoyId = req.userId
         const assignments = await DeliveryAssignment.find({
-            brodcastedTo: deliveryBoyId,
-            status: "brodcasted"
+            $or: [
+                { broadcastedTo: deliveryBoyId },
+                { brodcastedTo: deliveryBoyId }
+            ],
+            status: { $in: ["broadcasted", "brodcasted"] }
         })
             .populate("order")
             .populate("shop")
@@ -408,13 +446,13 @@ export const acceptOrder = async (req, res) => {
         if (!assignment) {
             return res.status(400).json({ message: "assignment not found" })
         }
-        if (assignment.status !== "brodcasted") {
+        if (assignment.status !== "broadcasted" && assignment.status !== "brodcasted") {
             return res.status(400).json({ message: "assignment is expired" })
         }
 
         const alreadyAssigned = await DeliveryAssignment.findOne({
             assignedTo: req.userId,
-            status: { $nin: ["brodcasted", "completed"] }
+            status: { $nin: ["broadcasted", "brodcasted", "completed"] }
         })
 
         if (alreadyAssigned) {
@@ -496,7 +534,7 @@ export const getCurrentOrder = async (req, res) => {
 
 
     } catch (error) {
-
+        return res.status(500).json({ message: `get current order error: ${error.message || error}` })
     }
 }
 
@@ -554,8 +592,7 @@ export const sendDeliveryOtp = async (req, res) => {
 
         return res.status(200).json({ 
             message: `OTP sent successfully to email ${order?.user?.email || order?.user?.fullName || 'customer'}`, 
-            email: order?.user?.email,
-            otp 
+            email: order?.user?.email
         })
     } catch (error) {
         console.error("sendDeliveryOtp error:", error);

@@ -434,12 +434,26 @@ export const getAllReels = async (req, res) => {
 export const getOwnerReels = async (req, res) => {
   try {
     const { ownerId } = req.params;
-    const reels = await Reel.find({ owner: ownerId })
+    const page = req.query.page ? parseInt(req.query.page) : null;
+    const limit = req.query.limit ? parseInt(req.query.limit) : null;
+    const skip = page && limit ? (page - 1) * limit : 0;
+
+    let query = Reel.find({ owner: ownerId })
       .populate("owner", "fullName email")
       .populate("shop", "name city image")
       .populate("foodItem", "name price image category foodType")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
+    if (page && limit) {
+      const [reels, total] = await Promise.all([
+        query.skip(skip).limit(limit),
+        Reel.countDocuments({ owner: ownerId })
+      ]);
+      return res.status(200).json({ data: reels, page, totalPages: Math.ceil(total / limit), total });
+    }
+
+    const reels = await query;
     return res.status(200).json(reels);
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch owner reels", error: error.message });

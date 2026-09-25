@@ -92,63 +92,13 @@ function UserDashboard() {
     }
   }, [categories]);
 
-  // Promotional Banner Items
-  const promoBanners = [
-    {
-      id: 1,
-      title: "50% OFF UP TO ₹100",
-      subtitle: "On your first 3 food orders",
-      code: "USE CODE: REELBITE50",
-      bg: "from-[#ff5200] to-red-600",
-      image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=600&auto=format&fit=crop"
-    },
-    {
-      id: 2,
-      title: "FREE DELIVERY",
-      subtitle: "On top rated restaurants in " + (currentCity || "your city"),
-      code: "NO CODE REQUIRED",
-      bg: "from-amber-600 to-[#ff5200]",
-      image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=600&auto=format&fit=crop"
-    },
-    {
-      id: 3,
-      title: "FLAT ₹125 OFF",
-      subtitle: "Gourmet biryani & Chinese combos",
-      code: "USE CODE: CRAVING125",
-      bg: "from-indigo-600 to-purple-700",
-      image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?q=80&w=600&auto=format&fit=crop"
-    }
-  ];
-
   return (
     <div className='w-full min-h-screen flex flex-col bg-[#f8f9fa] text-stone-900 font-sans pb-20 md:pb-12'>
       {/* Top Navbar */}
       <Nav />
 
-      {/* Main Container */}
-      <main className="pt-24 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 space-y-8">
-
-        {/* Promotional Banner Carousel */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {promoBanners.map((banner) => (
-            <div
-              key={banner.id}
-              className={`bg-gradient-to-r ${banner.bg} text-white p-5 rounded-2xl shadow-md flex items-center justify-between relative overflow-hidden group cursor-pointer`}
-            >
-              <div className="space-y-1.5 z-10 max-w-[65%]">
-                <span className="text-[10px] font-black uppercase bg-black/30 px-2 py-0.5 rounded-full tracking-wider">
-                  {banner.code}
-                </span>
-                <h3 className="text-xl font-black leading-tight tracking-tight">{banner.title}</h3>
-                <p className="text-xs text-white/90 font-medium">{banner.subtitle}</p>
-              </div>
-
-              <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-white/30 shadow-lg shrink-0 group-hover:scale-110 transition duration-500">
-                <img src={banner.image} alt={banner.title} className="w-full h-full object-cover" />
-              </div>
-            </div>
-          ))}
-        </section>
+      {/* Main Container - ultra-compact top spacing directly below fixed navbar */}
+      <main className="pt-[68px] sm:pt-[76px] max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 space-y-4">
 
         {/* Search Results if any */}
         {searchItems && searchItems.length > 0 && (
@@ -184,11 +134,10 @@ function UserDashboard() {
             <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-none snap-x" ref={cateScrollRef}>
               <button
                 onClick={() => handleFilterByCategory("All")}
-                className={`flex-none px-5 py-2.5 rounded-2xl font-bold text-xs transition border shadow-sm ${
-                  activeCategory === "All"
+                className={`flex-none px-5 py-2.5 rounded-2xl font-bold text-xs transition border shadow-sm ${activeCategory === "All"
                     ? "bg-[#ff5200] text-white border-[#ff5200]"
                     : "bg-white text-stone-700 border-stone-200 hover:border-[#ff5200]"
-                }`}
+                  }`}
               >
                 All Cuisines
               </button>
@@ -230,11 +179,10 @@ function UserDashboard() {
             {/* Pure Veg Filter Chip */}
             <button
               onClick={handleVegToggle}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition flex items-center gap-1.5 ${
-                vegFilter
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition flex items-center gap-1.5 ${vegFilter
                   ? "bg-emerald-700 text-white border-emerald-700 shadow"
                   : "bg-white text-stone-700 border-stone-300 hover:border-emerald-600"
-              }`}
+                }`}
             >
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
               <span>Pure Veg</span>
@@ -243,11 +191,10 @@ function UserDashboard() {
             {/* Rating 4.0+ Chip */}
             <button
               onClick={() => setRatingFilter(!ratingFilter)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition flex items-center gap-1.5 ${
-                ratingFilter
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition flex items-center gap-1.5 ${ratingFilter
                   ? "bg-[#ff5200] text-white border-[#ff5200] shadow"
                   : "bg-white text-stone-700 border-stone-300 hover:border-[#ff5200]"
-              }`}
+                }`}
             >
               <FaStar className="text-yellow-400" size={12} />
               <span>Rating 4.0+</span>
@@ -256,11 +203,10 @@ function UserDashboard() {
             {/* Fast Delivery Chip */}
             <button
               onClick={() => setFastDeliveryFilter(!fastDeliveryFilter)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition flex items-center gap-1.5 ${
-                fastDeliveryFilter
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition flex items-center gap-1.5 ${fastDeliveryFilter
                   ? "bg-stone-900 text-white border-stone-900 shadow"
                   : "bg-white text-stone-700 border-stone-300 hover:border-stone-800"
-              }`}
+                }`}
             >
               <FaMotorcycle size={14} />
               <span>Fast Delivery</span>

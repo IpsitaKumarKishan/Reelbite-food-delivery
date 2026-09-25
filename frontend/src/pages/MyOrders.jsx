@@ -6,9 +6,11 @@ import { useNavigate } from 'react-router-dom';
 import UserOrderCard from '../components/UserOrderCard';
 import OwnerOrderCard from '../components/OwnerOrderCard';
 import { setMyOrders, updateRealtimeOrderStatus } from '../redux/userSlice';
+import { useSocket } from '../context/SocketContext';
 
 function MyOrders() {
-  const { userData, myOrders, socket } = useSelector(state => state.user);
+  const { userData, myOrders } = useSelector(state => state.user);
+  const { socket } = useSocket();
   const navigate = useNavigate();
   const dispatch = useDispatch();
 

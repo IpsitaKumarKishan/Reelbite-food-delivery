@@ -30,6 +30,9 @@ export const getCurrentUser = async (req, res) => {
     }
     const formattedCart = formatUserCart(user.cart)
     const userObj = user.toObject()
+    delete userObj.password
+    delete userObj.resetOtp
+    delete userObj.otpExpires
     userObj.cart = formattedCart
     return res.status(200).json(userObj)
   } catch (error) {

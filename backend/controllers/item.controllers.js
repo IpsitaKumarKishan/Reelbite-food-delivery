@@ -1,5 +1,6 @@
 import Item from "../models/item.model.js";
 import Shop from "../models/shop.model.js";
+import Rating from "../models/rating.model.js";
 import uploadOnCloudinary from "../utils/cloudinary.js";
 
 export const addItem = async (req, res) => {
@@ -77,7 +78,7 @@ export const deleteItem = async (req, res) => {
             return res.status(400).json({ message: "item not found" })
         }
         const shop = await Shop.findOne({ owner: req.userId })
-        shop.items = shop.items.filter(i => i !== item._id)
+        shop.items = shop.items.filter(i => !i.equals(item._id))
         await shop.save()
         await shop.populate({
             path: "items",
@@ -105,7 +106,7 @@ export const getItemByCity = async (req, res) => {
         }
         
         const shopIds = shops.map((shop) => shop._id)
-        const items = await Item.find({ shop: { $in: shopIds } })
+        const items = await Item.find({ shop: { $in: shopIds } }).lean()
         return res.status(200).json(items)
 
     } catch (error) {
@@ -116,7 +117,7 @@ export const getItemByCity = async (req, res) => {
 export const getItemsByShop=async (req,res) => {
     try {
         const {shopId}=req.params
-        const shop=await Shop.findById(shopId).populate("items")
+        const shop=await Shop.findById(shopId).populate("items").lean()
         if(!shop){
             return res.status(400).json("shop not found")
         }
@@ -132,7 +133,7 @@ export const searchItems=async (req,res) => {
     try {
         const {query,city}=req.query
         if(!query || !city){
-            return null
+            return res.status(400).json({ message: "query and city are required" })
         }
         const shops=await Shop.find({
             city:{$regex:new RegExp(`^${city}$`, "i")}
@@ -148,7 +149,7 @@ export const searchItems=async (req,res) => {
               {category:{$regex:query,$options:"i"}}  
             ]
 
-        }).populate("shop","name image")
+        }).populate("shop","name image").lean()
 
         return res.status(200).json(items)
 
@@ -175,13 +176,28 @@ export const rating=async (req,res) => {
               return res.status(400).json({message:"item not found"})
         }
 
-        const newCount=item.rating.count + 1
-        const newAverage=(item.rating.average*item.rating.count + rating)/newCount
-
-        item.rating.count=newCount
-        item.rating.average=newAverage
-        await item.save()
-return res.status(200).json({rating:item.rating})
+        let existingRating = await Rating.findOne({ user: req.userId, item: itemId });
+        if (existingRating) {
+            const oldCount = item.rating.count;
+            const oldAverage = item.rating.average;
+            const oldVal = existingRating.rating;
+            const newAverage = oldCount > 1 
+                ? ((oldAverage * oldCount) - oldVal + rating) / oldCount
+                : rating;
+            item.rating.average = Math.round(newAverage * 10) / 10;
+            existingRating.rating = rating;
+            await existingRating.save();
+            await item.save();
+            return res.status(200).json({ rating: item.rating, message: "Rating updated" });
+        } else {
+            await Rating.create({ user: req.userId, item: itemId, rating });
+            const newCount = (item.rating.count || 0) + 1;
+            const newAverage = (((item.rating.average || 0) * (item.rating.count || 0)) + rating) / newCount;
+            item.rating.count = newCount;
+            item.rating.average = Math.round(newAverage * 10) / 10;
+            await item.save();
+            return res.status(200).json({ rating: item.rating, message: "Rating submitted" });
+        }
 
     } catch (error) {
          return res.status(500).json({ message: `rating error ${error}` })

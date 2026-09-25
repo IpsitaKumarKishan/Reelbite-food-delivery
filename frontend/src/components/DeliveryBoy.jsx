@@ -6,9 +6,11 @@ import { serverUrl } from '../App'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import DeliveryBoyTracking from './DeliveryBoyTracking'
 import { ClipLoader } from 'react-spinners'
+import { useSocket } from '../context/SocketContext'
 
 function DeliveryBoy() {
-  const { userData, socket } = useSelector(state => state.user)
+  const { userData } = useSelector(state => state.user)
+  const { socket } = useSocket()
   const [availableAssignments, setAvailableAssignments] = useState([])
   const [currentOrder, setCurrentOrder] = useState(null)
   const [otp, setOtp] = useState("")

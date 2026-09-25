@@ -2,12 +2,13 @@ import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
 import path from 'path';
 
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
 const uploadOnCloudinary = async (file) => {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-  });
   try {
     const result = await cloudinary.uploader.upload(file);
     if (fs.existsSync(file)) fs.unlinkSync(file);
@@ -20,11 +21,6 @@ const uploadOnCloudinary = async (file) => {
 };
 
 export const uploadVideoOnCloudinary = async (file) => {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-  });
   try {
     const result = await cloudinary.uploader.upload(file, {
       resource_type: "video",
