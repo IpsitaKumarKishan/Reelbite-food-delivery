@@ -53,7 +53,7 @@ const io = new Server(server, {
 
 app.set("io", io)
 
-const port = process.env.PORT || 5000
+const port = process.env.PORT || 8000
 app.use(cors(corsOptions))
 app.use(express.json({ limit: "10mb" }))
 app.use(cookieParser())

@@ -47,9 +47,9 @@ COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 # Ensure upload directory exists
 RUN mkdir -p public/uploads
 
-EXPOSE 5000
+EXPOSE 8000
 
 ENV NODE_ENV=production
-ENV PORT=5000
+ENV PORT=8000
 
 CMD ["node", "index.js"]
