@@ -2,9 +2,9 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { useSelector } from "react-redux";
 
-const serverUrl = import.meta.env.VITE_SERVER_URL !== undefined
+const serverUrl = (import.meta.env.VITE_SERVER_URL !== undefined && import.meta.env.VITE_SERVER_URL !== "")
   ? import.meta.env.VITE_SERVER_URL
-  : "http://localhost:5000";
+  : (import.meta.env.MODE === 'production' ? "" : "http://localhost:5000");
 
 const SocketContext = createContext({ socket: null });
 

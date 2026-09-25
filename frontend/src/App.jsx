@@ -28,7 +28,7 @@ import LikedReels from './pages/LikedReels'
 import NotFound from './pages/NotFound'
 import { Toaster } from 'react-hot-toast'
 
-export const serverUrl = import.meta.env.VITE_SERVER_URL !== undefined
+export const serverUrl = (import.meta.env.VITE_SERVER_URL !== undefined && import.meta.env.VITE_SERVER_URL !== "")
   ? import.meta.env.VITE_SERVER_URL
   : (import.meta.env.MODE === 'production' ? "" : "http://localhost:5000");
 

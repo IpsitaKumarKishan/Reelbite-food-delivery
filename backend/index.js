@@ -3,6 +3,9 @@ import dotenv from "dotenv"
 dotenv.config()
 import connectDb from "./config/db.js"
 import cookieParser from "cookie-parser"
+import path from "path"
+import fs from "fs"
+import { fileURLToPath } from "url"
 import authRouter from "./routes/auth.routes.js"
 import cors from "cors"
 import userRouter from "./routes/user.routes.js"
@@ -29,9 +32,13 @@ const allowedOrigins = [
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const frontendDistPath = path.join(__dirname, "../frontend/dist")
+
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV === "production") {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
@@ -89,7 +96,20 @@ app.use("/api/payouts",payoutRouter)
 
 socketHandler(io)
 
-// 404 handler
+// Serve frontend static files if dist exists (Single-Server / Monolithic setup)
+if (fs.existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath))
+
+  // SPA fallback for all non-API GET routes
+  app.get("*", (req, res, next) => {
+    if (req.originalUrl.startsWith("/api")) {
+      return next()
+    }
+    res.sendFile(path.join(frontendDistPath, "index.html"))
+  })
+}
+
+// 404 handler for unmatched API routes
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" })
 })
