@@ -30,7 +30,7 @@ import { Toaster } from 'react-hot-toast'
 
 export const serverUrl = (import.meta.env.VITE_SERVER_URL !== undefined && import.meta.env.VITE_SERVER_URL !== "")
   ? import.meta.env.VITE_SERVER_URL
-  : (import.meta.env.MODE === 'production' ? "" : "http://localhost:5000");
+  : (import.meta.env.MODE === 'production' ? "" : "http://localhost:8000");
 
 function AuthenticatedDataLoader() {
   useUpdateLocation()
