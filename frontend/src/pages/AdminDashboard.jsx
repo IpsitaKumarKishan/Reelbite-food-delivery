@@ -23,6 +23,7 @@ import {
   FaChartPie,
   FaUserGear,
   FaCircleCheck,
+  FaTrashCan,
 } from "react-icons/fa6";
 import toast from "react-hot-toast";
 
@@ -40,6 +41,7 @@ export default function AdminDashboard() {
   const [shopSearch, setShopSearch] = useState("");
   const [users, setUsers] = useState([]);
   const [userRoleFilter, setUserRoleFilter] = useState("all");
+  const [userStatusFilter, setUserStatusFilter] = useState("all");
   const [userSearch, setUserSearch] = useState("");
   const [disputes, setDisputes] = useState([]);
 
@@ -143,6 +145,44 @@ export default function AdminDashboard() {
     }
   };
 
+  // Handler to update user status (active/suspended)
+  const handleUpdateUserStatus = async (userId, newStatus) => {
+    try {
+      const res = await axios.patch(
+        `${serverUrl}/api/admin/users/${userId}/status`,
+        { status: newStatus },
+        { withCredentials: true }
+      );
+      toast.success(res.data.message || `User status changed to ${newStatus}`);
+      setUsers((prev) =>
+        prev.map((u) => (u._id === userId ? { ...u, status: newStatus } : u))
+      );
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update user status");
+    }
+  };
+
+  // Handler to permanently delete/remove user
+  const handleDeleteUser = async (userId, userName) => {
+    if (userId === userData?._id) {
+      toast.error("You cannot delete your own admin account.");
+      return;
+    }
+    const confirmed = window.confirm(`Are you sure you want to permanently remove "${userName || "this user"}"? This will delete their account and history.`);
+    if (!confirmed) return;
+
+    try {
+      const res = await axios.delete(
+        `${serverUrl}/api/admin/users/${userId}`,
+        { withCredentials: true }
+      );
+      toast.success(res.data.message || "User account removed successfully");
+      setUsers((prev) => prev.filter((u) => u._id !== userId));
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to delete user");
+    }
+  };
+
   // If user is not admin, immediately redirect to home
   if (userData?.role !== "admin") {
     return null;
@@ -162,12 +202,16 @@ export default function AdminDashboard() {
   // Filtered Users
   const filteredUsers = users.filter((u) => {
     const matchesRole = userRoleFilter === "all" || u.role === userRoleFilter;
+    const matchesStatus =
+      userStatusFilter === "all" ||
+      (userStatusFilter === "suspended" && u.status === "suspended") ||
+      (userStatusFilter === "active" && u.status !== "suspended");
     const matchesSearch =
       !userSearch.trim() ||
-      u.fullName.toLowerCase().includes(userSearch.toLowerCase()) ||
-      u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
-      u.mobile.toLowerCase().includes(userSearch.toLowerCase());
-    return matchesRole && matchesSearch;
+      u.fullName?.toLowerCase().includes(userSearch.toLowerCase()) ||
+      u.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
+      u.mobile?.toLowerCase().includes(userSearch.toLowerCase());
+    return matchesRole && matchesStatus && matchesSearch;
   });
 
   return (
@@ -604,6 +648,17 @@ export default function AdminDashboard() {
                   <option value="deliveryBoy">Delivery Partners</option>
                   <option value="admin">Super Admins</option>
                 </select>
+
+                {/* Status Filter */}
+                <select
+                  value={userStatusFilter}
+                  onChange={(e) => setUserStatusFilter(e.target.value)}
+                  className="bg-stone-100 text-xs font-bold text-stone-700 px-3 py-2 rounded-xl border border-stone-200 outline-none"
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active Accounts</option>
+                  <option value="suspended">Suspended Accounts</option>
+                </select>
               </div>
             </div>
 
@@ -615,15 +670,16 @@ export default function AdminDashboard() {
                     <th className="pb-3 font-extrabold">User</th>
                     <th className="pb-3 font-extrabold">Contact Info</th>
                     <th className="pb-3 font-extrabold">Role</th>
+                    <th className="pb-3 font-extrabold">Status</th>
                     <th className="pb-3 font-extrabold">Activity</th>
                     <th className="pb-3 font-extrabold">Joined Date</th>
-                    <th className="pb-3 font-extrabold text-right">Assign Role</th>
+                    <th className="pb-3 font-extrabold text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-stone-400">
+                      <td colSpan={7} className="py-8 text-center text-stone-400">
                         No users found matching current filters.
                       </td>
                     </tr>
@@ -635,12 +691,12 @@ export default function AdminDashboard() {
                             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#ff5200] to-amber-500 text-white font-extrabold flex items-center justify-center text-xs shrink-0">
                               {u.fullName?.slice(0, 1).toUpperCase()}
                             </div>
-                            <span>{u.fullName}</span>
+                            <span className="truncate max-w-[130px]">{u.fullName}</span>
                           </div>
                         </td>
 
                         <td className="py-3.5 text-stone-600">
-                          <div>{u.email}</div>
+                          <div className="truncate max-w-[160px]">{u.email}</div>
                           <div className="text-[11px] text-stone-400">{u.mobile}</div>
                         </td>
 
@@ -661,6 +717,18 @@ export default function AdminDashboard() {
                         </td>
 
                         <td className="py-3.5">
+                          <span
+                            className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                              u.status === "suspended"
+                                ? "bg-rose-100 text-rose-700"
+                                : "bg-emerald-100 text-emerald-700"
+                            }`}
+                          >
+                            {u.status || "active"}
+                          </span>
+                        </td>
+
+                        <td className="py-3.5">
                           {u.isOnline ? (
                             <span className="flex items-center gap-1.5 text-emerald-600 font-bold">
                               <span className="w-2 h-2 rounded-full bg-emerald-500" />
@@ -676,16 +744,51 @@ export default function AdminDashboard() {
                         </td>
 
                         <td className="py-3.5 text-right">
-                          <select
-                            value={u.role}
-                            onChange={(e) => handleUpdateRole(u._id, e.target.value)}
-                            className="bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-[11px] px-2.5 py-1 rounded-lg border border-stone-200 outline-none cursor-pointer"
-                          >
-                            <option value="user">Consumer (user)</option>
-                            <option value="owner">Restaurant (owner)</option>
-                            <option value="deliveryBoy">Rider (deliveryBoy)</option>
-                            <option value="admin">Super Admin (admin)</option>
-                          </select>
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* Role Select */}
+                            <select
+                              value={u.role}
+                              onChange={(e) => handleUpdateRole(u._id, e.target.value)}
+                              className="bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-[11px] px-2 py-1 rounded-lg border border-stone-200 outline-none cursor-pointer"
+                            >
+                              <option value="user">Consumer</option>
+                              <option value="owner">Restaurant</option>
+                              <option value="deliveryBoy">Rider</option>
+                              <option value="admin">Admin</option>
+                            </select>
+
+                            {/* Suspend or Reactivate Button */}
+                            {u._id !== userData?._id && (
+                              u.status === "suspended" ? (
+                                <button
+                                  onClick={() => handleUpdateUserStatus(u._id, "active")}
+                                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[11px] font-bold transition whitespace-nowrap"
+                                  title="Reactivate user access"
+                                >
+                                  Reactivate
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleUpdateUserStatus(u._id, "suspended")}
+                                  className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-[11px] font-bold transition whitespace-nowrap"
+                                  title="Suspend user access"
+                                >
+                                  Suspend
+                                </button>
+                              )
+                            )}
+
+                            {/* Remove / Delete Button */}
+                            {u._id !== userData?._id && (
+                              <button
+                                onClick={() => handleDeleteUser(u._id, u.fullName)}
+                                className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                                title="Remove user permanently"
+                              >
+                                <FaTrashCan size={12} />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))

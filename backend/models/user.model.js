@@ -22,6 +22,11 @@ const userSchema = new mongoose.Schema({
         enum:["user","owner","deliveryBoy","admin"],
         required:true
     },
+    status:{
+        type:String,
+        enum:["active", "suspended"],
+        default:"active"
+    },
     resetOtp:{
         type:String
     },

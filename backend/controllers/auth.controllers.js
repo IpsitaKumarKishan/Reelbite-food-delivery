@@ -58,6 +58,10 @@ export const signIn=async (req,res) => {
         if(!user){
             return res.status(400).json({message:"User does not exist."})
         }
+
+        if (user.status === "suspended") {
+            return res.status(403).json({ message: "Your account has been suspended by the platform administrator." });
+        }
         
      const isMatch=await bcrypt.compare(password,user.password)
      if(!isMatch){
@@ -144,6 +148,9 @@ export const googleAuth = async (req, res) => {
     try {
         const { fullName, email, mobile, role } = req.body
         let user = await User.findOne({ email })
+        if (user && user.status === "suspended") {
+            return res.status(403).json({ message: "Your account has been suspended by the platform administrator." });
+        }
         if (!user) {
             user = await User.create({
                 fullName: fullName || (email ? email.split("@")[0] : "User"),
