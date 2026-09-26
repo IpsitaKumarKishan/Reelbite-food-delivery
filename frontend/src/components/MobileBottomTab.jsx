@@ -178,10 +178,28 @@ const MobileBottomTab = () => {
                       </div>
                     </div>
                     <button
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        dispatch(addToCart(item));
+                        dispatch(
+                          addToCart({
+                            id: item._id,
+                            _id: item._id,
+                            name: item.name,
+                            price: item.price,
+                            image: item.image,
+                            shop: item.shop?._id || item.shop,
+                            quantity: 1,
+                            foodType: item.foodType,
+                          })
+                        );
                         toast.success(`${item.name} added!`);
+                        try {
+                          await axios.post(
+                            `${serverUrl}/api/user/cart/add`,
+                            { itemId: item._id, quantity: 1 },
+                            { withCredentials: true }
+                          );
+                        } catch (err) {}
                       }}
                       className="bg-[#ff5200] text-white px-3 py-1.5 rounded-xl text-[11px] font-extrabold shrink-0 shadow-sm active:scale-95 transition"
                     >

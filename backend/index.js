@@ -16,6 +16,9 @@ import reelRouter from "./routes/reel.routes.js"
 import payoutRouter from "./routes/payout.routes.js"
 import recommendationRouter from "./routes/recommendation.routes.js"
 import couponRouter from "./routes/coupon.routes.js"
+import reviewRouter from "./routes/review.routes.js"
+import analyticsRouter from "./routes/analytics.routes.js"
+import adminRouter from "./routes/admin.routes.js"
 import http from "http"
 import { Server } from "socket.io"
 import { socketHandler } from "./socket.js"
@@ -97,6 +100,9 @@ app.use("/api/reels",reelRouter)
 app.use("/api/payouts",payoutRouter)
 app.use("/api/recommendations",recommendationRouter)
 app.use("/api/coupons",couponRouter)
+app.use("/api/reviews",reviewRouter)
+app.use("/api/analytics",analyticsRouter)
+app.use("/api/admin",adminRouter)
 
 socketHandler(io)
 

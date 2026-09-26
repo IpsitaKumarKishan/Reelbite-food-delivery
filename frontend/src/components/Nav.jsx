@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { FaLocationDot, FaPlus, FaFilm, FaUtensils, FaMotorcycle, FaStore, FaHeart, FaGear } from "react-icons/fa6";
+import React, { useState, useEffect, useRef } from 'react';
+import { FaLocationDot, FaPlus, FaFilm, FaUtensils, FaMotorcycle, FaStore, FaHeart, FaGear, FaBell, FaChartLine, FaShieldHalved } from "react-icons/fa6";
 import { IoIosSearch } from "react-icons/io";
 import { FiShoppingCart } from "react-icons/fi";
 import { useDispatch, useSelector } from 'react-redux';
@@ -13,17 +13,22 @@ import { useNavigate } from 'react-router-dom';
 import CuisinePreferencesModal from './modals/CuisinePreferencesModal';
 import ProfileSettingsModal from './modals/ProfileSettingsModal';
 import SavedAddressesModal from './modals/SavedAddressesModal';
+import NotificationDropdown from './NotificationDropdown';
+import { useNotifications } from '../context/NotificationContext';
 
 function Nav() {
     const { userData, currentCity, cartItems } = useSelector(state => state.user);
     const { myShopData } = useSelector(state => state.owner || {});
+    const { unreadCount } = useNotifications();
     const [showInfo, setShowInfo] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
+    const [showNotifications, setShowNotifications] = useState(false);
     const [query, setQuery] = useState("");
     const [showCuisineModal, setShowCuisineModal] = useState(false);
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [showAddressesModal, setShowAddressesModal] = useState(false);
     const dropdownRef = useRef(null);
+    const notifRef = useRef(null);
     const dispatch = useDispatch();
     const navigate = useNavigate();
 
@@ -58,6 +63,9 @@ function Nav() {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setShowInfo(false);
+            }
+            if (notifRef.current && !notifRef.current.contains(event.target)) {
+                setShowNotifications(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
@@ -108,6 +116,28 @@ function Nav() {
                     <FaFilm size={11} className="animate-pulse" />
                     <span>Reels</span>
                 </button>
+
+                {/* Owner Analytics Button */}
+                {userData?.role === "owner" && (
+                    <button
+                        onClick={() => navigate("/owner/analytics")}
+                        className="hidden sm:flex items-center gap-1.5 bg-orange-100 hover:bg-orange-200 text-[#ff5200] px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-extrabold border border-orange-200 shadow-sm transition hover:scale-105"
+                    >
+                        <FaChartLine size={11} />
+                        <span>Analytics</span>
+                    </button>
+                )}
+
+                {/* Super Admin Command Center Button */}
+                {userData?.role === "admin" && (
+                    <button
+                        onClick={() => navigate("/admin")}
+                        className="flex items-center gap-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-extrabold shadow-md hover:scale-105 transition"
+                    >
+                        <FaShieldHalved size={11} />
+                        <span>Super Admin</span>
+                    </button>
+                )}
             </div>
 
             {/* Central Search Bar (Desktop - Customer Only) */}
@@ -214,6 +244,28 @@ function Nav() {
                     </div>
                 )}
 
+                {/* Real-Time Notification Bell */}
+                {userData && (
+                    <div className="relative" ref={notifRef}>
+                        <div
+                            className='relative cursor-pointer p-1.5 sm:p-2 rounded-full hover:bg-stone-100 transition text-stone-700 flex items-center justify-center'
+                            onClick={() => setShowNotifications(prev => !prev)}
+                            title="Notifications"
+                        >
+                            <FaBell size={18} />
+                            {unreadCount > 0 && (
+                                <span className='absolute -top-0.5 -right-0.5 bg-[#ff5200] text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-white shadow-xs'>
+                                    {unreadCount > 9 ? "9+" : unreadCount}
+                                </span>
+                            )}
+                        </div>
+
+                        {showNotifications && (
+                            <NotificationDropdown onClose={() => setShowNotifications(false)} />
+                        )}
+                    </div>
+                )}
+
                 {/* User Avatar Dropdown (All Logged-in Users) */}
                 {userData ? (
                     <div className="relative" ref={dropdownRef}>
@@ -264,12 +316,53 @@ function Nav() {
                                             </div>
                                             <div
                                                 className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
+                                                onClick={() => { setShowInfo(false); navigate("/owner/analytics"); }}
+                                            >
+                                                <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                                    <FaChartLine size={13} />
+                                                </div>
+                                                <span>Kitchen Analytics</span>
+                                            </div>
+                                            <div
+                                                className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
                                                 onClick={() => { setShowInfo(false); navigate("/my-orders"); }}
                                             >
                                                 <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
                                                     <TbReceipt2 size={14} />
                                                 </div>
                                                 <span>Restaurant Orders</span>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {userData.role === "admin" && (
+                                        <>
+                                            <div
+                                                className='text-xs font-bold text-purple-700 hover:text-purple-900 hover:bg-purple-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
+                                                onClick={() => { setShowInfo(false); navigate("/admin"); }}
+                                            >
+                                                <div className='w-7 h-7 rounded-xl bg-purple-100 group-hover:bg-purple-600 group-hover:text-white text-purple-600 flex items-center justify-center transition shrink-0'>
+                                                    <FaShieldHalved size={13} />
+                                                </div>
+                                                <span>Super Admin Center</span>
+                                            </div>
+                                            <div
+                                                className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
+                                                onClick={() => { setShowInfo(false); navigate("/owner/analytics"); }}
+                                            >
+                                                <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                                    <FaChartLine size={13} />
+                                                </div>
+                                                <span>Kitchen Analytics</span>
+                                            </div>
+                                            <div
+                                                className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
+                                                onClick={() => { setShowInfo(false); navigate("/my-orders"); }}
+                                            >
+                                                <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                                    <TbReceipt2 size={14} />
+                                                </div>
+                                                <span>All Orders</span>
                                             </div>
                                         </>
                                     )}

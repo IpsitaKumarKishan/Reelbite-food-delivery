@@ -33,6 +33,19 @@ const shopSchema=new mongoose.Schema({
     commissionRate:{
         type:Number,
         default:20
+    },
+    rating: {
+        average: { type: Number, default: 4.2 },
+        count: { type: Number, default: 0 }
+    },
+    isApproved: {
+        type: Boolean,
+        default: true
+    },
+    status: {
+        type: String,
+        enum: ["active", "pending", "suspended"],
+        default: "active"
     }
 
 },{timestamps:true})

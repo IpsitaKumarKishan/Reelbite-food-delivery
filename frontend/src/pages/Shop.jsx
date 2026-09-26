@@ -144,6 +144,7 @@ function Shop() {
   const [shop, setShop] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [reviewsData, setReviewsData] = useState({ reviews: [], stats: null });
   const navigate = useNavigate();
 
   const handleShop = async () => {
@@ -158,8 +159,20 @@ function Shop() {
     }
   };
 
+  const handleReviews = async () => {
+    try {
+      const res = await axios.get(`${serverUrl}/api/reviews/shop/${shopId}`);
+      if (res.data?.success) {
+        setReviewsData({ reviews: res.data.reviews || [], stats: res.data.stats });
+      }
+    } catch (err) {
+      console.log("Reviews fetch error:", err);
+    }
+  };
+
   useEffect(() => {
     handleShop();
+    handleReviews();
   }, [shopId]);
 
   // Extract categories present in items
@@ -266,6 +279,110 @@ function Shop() {
             </div>
           )}
         </div>
+
+        {/* Customer Reviews & Ratings Section */}
+        <section className="space-y-6 pt-8 border-t border-stone-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-black text-stone-900 tracking-tight">
+                Ratings & Customer Reviews
+              </h3>
+              <p className="text-xs text-stone-500 font-medium">
+                Verified reviews from customers who ordered from {shop?.name || "this kitchen"}
+              </p>
+            </div>
+          </div>
+
+          {/* Rating Summary Card */}
+          <div className="bg-white border border-stone-200 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row items-center gap-6">
+            <div className="text-center sm:border-r sm:border-stone-200 sm:pr-8 shrink-0">
+              <span className="text-4xl font-black text-stone-900">
+                {reviewsData.stats?.average || shop?.rating?.average || 4.2}
+              </span>
+              <div className="flex items-center justify-center gap-1 my-1 text-amber-400">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <FaStar key={s} size={14} className={s <= Math.round(reviewsData.stats?.average || 4) ? "text-amber-400" : "text-stone-300"} />
+                ))}
+              </div>
+              <p className="text-xs text-stone-500 font-bold">
+                {reviewsData.stats?.count || 0} reviews
+              </p>
+            </div>
+
+            {/* Star Distribution Bars */}
+            <div className="flex-1 w-full space-y-1.5">
+              {[5, 4, 3, 2, 1].map((star) => {
+                const total = reviewsData.stats?.count || 1;
+                const count = reviewsData.stats?.starCounts?.[star] || 0;
+                const pct = Math.round((count / total) * 100);
+
+                return (
+                  <div key={star} className="flex items-center gap-2 text-xs">
+                    <span className="w-5 font-bold text-stone-600 flex items-center gap-0.5">
+                      {star}<FaStar size={10} className="text-amber-400" />
+                    </span>
+                    <div className="flex-1 h-2 rounded-full bg-stone-100 overflow-hidden">
+                      <div
+                        className="h-full bg-[#ff5200] rounded-full transition-all duration-500"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span className="w-8 text-[11px] text-stone-400 text-right">{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Reviews List */}
+          <div className="space-y-3">
+            {reviewsData.reviews && reviewsData.reviews.length > 0 ? (
+              reviewsData.reviews.map((r) => (
+                <div key={r._id} className="bg-white border border-stone-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-orange-100 text-[#ff5200] font-black text-xs flex items-center justify-center">
+                        {r.user?.fullName?.slice(0, 1) || "U"}
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-stone-900">{r.user?.fullName || "Verified Customer"}</h4>
+                        <span className="text-[10px] text-stone-400">
+                          {new Date(r.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-lg text-xs font-extrabold">
+                      <span>{r.shopRating}</span>
+                      <FaStar size={11} className="text-emerald-700" />
+                    </div>
+                  </div>
+
+                  {r.reviewText && (
+                    <p className="text-xs text-stone-700 leading-relaxed pt-1">
+                      "{r.reviewText}"
+                    </p>
+                  )}
+
+                  {/* Reviewed items pills */}
+                  {r.itemReviews && r.itemReviews.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {r.itemReviews.map((ir, i) => (
+                        <span key={i} className="text-[10px] bg-stone-50 border border-stone-200 text-stone-600 px-2 py-0.5 rounded-md font-medium">
+                          {ir.item?.name || "Dish"}: {ir.rating}★
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="py-8 text-center text-stone-500 text-xs bg-white rounded-2xl border border-stone-200">
+                No customer reviews yet. Be the first to order and review this kitchen!
+              </div>
+            )}
+          </div>
+        </section>
       </main>
     </div>
   );

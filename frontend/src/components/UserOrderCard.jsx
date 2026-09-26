@@ -2,10 +2,13 @@ import axios from 'axios'
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { serverUrl } from '../App'
+import RatingModal from './modals/RatingModal'
+import { FaStar } from 'react-icons/fa6'
 
 function UserOrderCard({ data }) {
     const navigate = useNavigate()
     const [selectedRating, setSelectedRating] = useState({})//itemId:rating
+    const [showRatingModal, setShowRatingModal] = useState(false)
 
     const formatDate = (dateString) => {
         const date = new Date(dateString)
@@ -113,10 +116,30 @@ function UserOrderCard({ data }) {
                 </div>
             )}
 
-            <div className='flex justify-between items-center border-t pt-2'>
+            <div className='flex justify-between items-center border-t pt-2 gap-2'>
                 <p className='font-semibold'>Total: ₹{data.totalAmount}</p>
-                <button className='bg-[#ff4d2d] hover:bg-[#e64526] text-white px-4 py-2 rounded-lg text-sm' onClick={() => navigate(`/track-order/${data._id}`)}>Track Order</button>
+                <div className='flex items-center gap-2'>
+                    {data.shopOrders?.[0]?.status === "delivered" && (
+                        <button
+                            onClick={() => setShowRatingModal(true)}
+                            className='px-3.5 py-2 rounded-lg text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 transition flex items-center gap-1 cursor-pointer'
+                        >
+                            <FaStar className="text-amber-500" size={12} />
+                            <span>Rate Order</span>
+                        </button>
+                    )}
+                    <button className='bg-[#ff4d2d] hover:bg-[#e64526] text-white px-4 py-2 rounded-lg text-sm font-bold' onClick={() => navigate(`/track-order/${data._id}`)}>Track Order</button>
+                </div>
             </div>
+
+            {showRatingModal && data.shopOrders?.[0] && (
+                <RatingModal
+                    order={data}
+                    shopOrder={data.shopOrders[0]}
+                    onClose={() => setShowRatingModal(false)}
+                    onReviewSubmitted={() => setShowRatingModal(false)}
+                />
+            )}
         </div>
     )
 }

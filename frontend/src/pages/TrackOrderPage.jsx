@@ -3,9 +3,10 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { serverUrl } from '../App';
 import { IoIosArrowRoundBack } from "react-icons/io";
-import { FaClock, FaBan, FaRotateLeft, FaCircleCheck, FaTriangleExclamation } from "react-icons/fa6";
+import { FaClock, FaBan, FaRotateLeft, FaCircleCheck, FaTriangleExclamation, FaStar } from "react-icons/fa6";
 import DeliveryBoyTracking from '../components/DeliveryBoyTracking';
 import { useSocket } from '../context/SocketContext';
+import RatingModal from '../components/modals/RatingModal';
 import toast from 'react-hot-toast';
 
 function TrackOrderPage() {
@@ -16,6 +17,7 @@ function TrackOrderPage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState("Ordered by mistake");
   const [isCancelling, setIsCancelling] = useState(false);
+  const [reviewTargetShopOrder, setReviewTargetShopOrder] = useState(null);
 
   const navigate = useNavigate();
   const { socket } = useSocket();
@@ -242,9 +244,18 @@ function TrackOrderPage() {
                   </p>
                 )
               ) : (
-                <div className='flex items-center gap-1.5 text-emerald-700 font-bold text-sm bg-emerald-50 p-2.5 rounded-xl border border-emerald-200'>
-                  <FaCircleCheck />
-                  <span>Delivered successfully! Enjoy your meal.</span>
+                <div className='flex items-center justify-between bg-emerald-50 p-3 rounded-xl border border-emerald-200 gap-3'>
+                  <div className='flex items-center gap-1.5 text-emerald-700 font-bold text-xs sm:text-sm'>
+                    <FaCircleCheck />
+                    <span>Delivered successfully! Enjoy your meal.</span>
+                  </div>
+                  <button
+                    onClick={() => setReviewTargetShopOrder(shopOrder)}
+                    className='px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-black flex items-center gap-1 shadow-xs cursor-pointer shrink-0'
+                  >
+                    <FaStar size={11} />
+                    <span>Rate Meal</span>
+                  </button>
                 </div>
               )
             )}
@@ -327,6 +338,19 @@ function TrackOrderPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Post-Delivery Rating Modal */}
+      {reviewTargetShopOrder && (
+        <RatingModal
+          order={currentOrder}
+          shopOrder={reviewTargetShopOrder}
+          onClose={() => setReviewTargetShopOrder(null)}
+          onReviewSubmitted={() => {
+            setReviewTargetShopOrder(null);
+            handleGetOrder();
+          }}
+        />
       )}
     </div>
   );

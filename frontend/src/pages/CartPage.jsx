@@ -21,7 +21,7 @@ function CartPage() {
                 ) : (<>
                     <div className='space-y-4'>
                         {cartItems?.map((item, index) => (
-                            <CartItemCard data={item} key={index} />
+                            <CartItemCard data={item} key={item.id || item._id || index} />
                         ))}
                     </div>
                     <CartCrossSell />

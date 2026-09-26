@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { FaLeaf, FaDrumstickBite, FaStar, FaRegStar, FaMinus, FaPlus, FaShoppingCart } from "react-icons/fa";
 import { useDispatch, useSelector } from 'react-redux';
 import { addToCart } from '../redux/userSlice';
+import axios from 'axios';
+import { serverUrl } from '../App';
 
 function FoodCard({ data }) {
   const [quantity, setQuantity] = useState(1);
@@ -32,7 +34,31 @@ function FoodCard({ data }) {
     }
   };
 
-  const isAlreadyInCart = cartItems.some(i => i.id === data._id);
+  const isAlreadyInCart = cartItems.some(i => (i.id || i._id) === data._id);
+
+  const handleAddToCart = async () => {
+    dispatch(
+      addToCart({
+        id: data._id,
+        _id: data._id,
+        name: data.name,
+        price: data.price,
+        image: data.image,
+        shop: data.shop,
+        quantity,
+        foodType: data.foodType,
+      })
+    );
+    try {
+      await axios.post(
+        `${serverUrl}/api/user/cart/add`,
+        { itemId: data._id, quantity },
+        { withCredentials: true }
+      );
+    } catch (e) {
+      // Redux retains the item for client session
+    }
+  };
 
   return (
     <div className='w-full max-w-[260px] rounded-3xl border border-amber-500/20 bg-white shadow-md hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden group'>
@@ -95,19 +121,7 @@ function FoodCard({ data }) {
                 ? "bg-emerald-600 hover:bg-emerald-700"
                 : "bg-[#ea580c] hover:bg-[#c2410c]"
             }`}
-            onClick={() => {
-              dispatch(
-                addToCart({
-                  id: data._id,
-                  name: data.name,
-                  price: data.price,
-                  image: data.image,
-                  shop: data.shop,
-                  quantity,
-                  foodType: data.foodType,
-                })
-              );
-            }}
+            onClick={handleAddToCart}
           >
             <FaShoppingCart size={12} />
             <span>{isAlreadyInCart ? "Added" : "Add"}</span>

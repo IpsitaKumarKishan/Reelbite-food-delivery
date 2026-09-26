@@ -6,16 +6,20 @@ const formatUserCart = (cartArray) => {
   if (!cartArray) return [];
   return cartArray
     .filter(c => c && c.item)
-    .map(c => ({
-      id: c.item._id || c.item,
-      name: c.item.name || "",
-      price: c.item.price || 0,
-      image: c.item.image || "",
-      quantity: c.quantity || 1,
-      shop: c.item.shop || null,
-      category: c.item.category || "",
-      foodType: c.item.foodType || ""
-    }));
+    .map(c => {
+      const itemIdStr = c.item._id ? c.item._id.toString() : c.item.toString();
+      return {
+        id: itemIdStr,
+        _id: itemIdStr,
+        name: c.item.name || "",
+        price: c.item.price || 0,
+        image: c.item.image || "",
+        quantity: c.quantity || 1,
+        shop: c.item.shop || null,
+        category: c.item.category || "",
+        foodType: c.item.foodType || ""
+      };
+    });
 };
 
 export const getCurrentUser = async (req, res) => {
@@ -77,7 +81,13 @@ export const addToCartBackend = async (req, res) => {
     const user = await User.findById(req.userId)
     if (!user) return res.status(404).json({ message: "User not found" })
 
-    const existingIndex = user.cart.findIndex(c => c.item && c.item.toString() === itemId)
+    const targetItemId = itemId.toString()
+    const existingIndex = user.cart.findIndex(c => {
+      if (!c || !c.item) return false
+      const cItemId = c.item._id ? c.item._id.toString() : c.item.toString()
+      return cItemId === targetItemId
+    })
+
     if (existingIndex > -1) {
       user.cart[existingIndex].quantity += Number(quantity)
     } else {
@@ -100,10 +110,19 @@ export const updateCartQuantityBackend = async (req, res) => {
     const user = await User.findById(req.userId)
     if (!user) return res.status(404).json({ message: "User not found" })
 
+    const targetItemId = itemId.toString()
     if (quantity <= 0) {
-      user.cart = user.cart.filter(c => c.item && c.item.toString() !== itemId)
+      user.cart = user.cart.filter(c => {
+        if (!c || !c.item) return false
+        const cItemId = c.item._id ? c.item._id.toString() : c.item.toString()
+        return cItemId !== targetItemId
+      })
     } else {
-      const existing = user.cart.find(c => c.item && c.item.toString() === itemId)
+      const existing = user.cart.find(c => {
+        if (!c || !c.item) return false
+        const cItemId = c.item._id ? c.item._id.toString() : c.item.toString()
+        return cItemId === targetItemId
+      })
       if (existing) {
         existing.quantity = Number(quantity)
       }
@@ -120,10 +139,19 @@ export const updateCartQuantityBackend = async (req, res) => {
 export const removeCartItemBackend = async (req, res) => {
   try {
     const { itemId } = req.params
+    if (!itemId || itemId === "undefined" || itemId === "null") {
+      return res.status(400).json({ message: "Valid itemId is required" })
+    }
     const user = await User.findById(req.userId)
     if (!user) return res.status(404).json({ message: "User not found" })
 
-    user.cart = user.cart.filter(c => c.item && c.item.toString() !== itemId)
+    const targetItemId = itemId.toString()
+    user.cart = user.cart.filter(c => {
+      if (!c || !c.item) return false
+      const cItemId = c.item._id ? c.item._id.toString() : c.item.toString()
+      return cItemId !== targetItemId
+    })
+
     await user.save()
     await user.populate("cart.item")
     return res.status(200).json(formatUserCart(user.cart))

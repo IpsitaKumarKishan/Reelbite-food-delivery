@@ -52,10 +52,11 @@ export default function CartCrossSell() {
 
   if (!crossSells || crossSells.length === 0) return null;
 
-  const handleAdd = (item) => {
+  const handleAdd = async (item) => {
     dispatch(
       addToCart({
         id: item._id,
+        _id: item._id,
         name: item.name,
         price: item.price,
         image: item.image,
@@ -65,6 +66,15 @@ export default function CartCrossSell() {
       })
     );
     toast.success(`Added ${item.name} to cart!`);
+    try {
+      await axios.post(
+        `${serverUrl}/api/user/cart/add`,
+        { itemId: item._id, quantity: 1 },
+        { withCredentials: true }
+      );
+    } catch (e) {
+      // offline / fallback
+    }
   };
 
   return (

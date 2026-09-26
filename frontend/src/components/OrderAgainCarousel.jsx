@@ -2,6 +2,8 @@ import React, { useRef, useState, useEffect } from "react";
 import { FaCircleChevronLeft, FaCircleChevronRight, FaLeaf, FaDrumstickBite, FaRotateRight, FaPlus, FaCheck } from "react-icons/fa6";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../redux/userSlice";
+import axios from "axios";
+import { serverUrl } from "../App";
 import toast from "react-hot-toast";
 
 export default function OrderAgainCarousel({ items = [] }) {
@@ -37,10 +39,11 @@ export default function OrderAgainCarousel({ items = [] }) {
 
   if (!items || items.length === 0) return null;
 
-  const handleReorder = (item) => {
+  const handleReorder = async (item) => {
     dispatch(
       addToCart({
         id: item._id,
+        _id: item._id,
         name: item.name,
         price: item.price,
         image: item.image,
@@ -50,6 +53,13 @@ export default function OrderAgainCarousel({ items = [] }) {
       })
     );
     toast.success(`Added ${item.name} to cart!`);
+    try {
+      await axios.post(
+        `${serverUrl}/api/user/cart/add`,
+        { itemId: item._id, quantity: 1 },
+        { withCredentials: true }
+      );
+    } catch (e) {}
   };
 
   return (

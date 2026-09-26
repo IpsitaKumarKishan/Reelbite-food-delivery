@@ -426,8 +426,10 @@ export const updateOrderStatus = async (req, res) => {
                 io.to(userSocketId).emit('update-status', {
                     orderId: order._id,
                     shopId: updatedShopOrder.shop._id,
+                    shopName: updatedShopOrder.shop?.name || "Restaurant",
                     status: updatedShopOrder.status,
-                    userId: order.user._id
+                    userId: order.user._id,
+                    timestamp: new Date()
                 })
             }
         }

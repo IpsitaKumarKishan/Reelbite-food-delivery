@@ -34,22 +34,44 @@ const userSlice = createSlice({
       state.itemsInMyCity = action.payload
     },
     setCartItems: (state, action) => {
-      state.cartItems = action.payload || []
-      state.totalAmount = (action.payload || []).reduce((sum, i) => sum + (i.price || 0) * (i.quantity || 0), 0)
+      const items = Array.isArray(action.payload) ? action.payload : []
+      state.cartItems = items.map(i => ({
+        ...i,
+        id: String(i.id || i._id || (i.item && (i.item._id || i.item)) || ""),
+        _id: String(i._id || i.id || (i.item && (i.item._id || i.item)) || ""),
+        price: Number(i.price) || 0,
+        quantity: Number(i.quantity) || 1
+      }))
+      state.totalAmount = state.cartItems.reduce((sum, i) => sum + (i.price || 0) * (i.quantity || 0), 0)
     },
     addToCart: (state, action) => {
       if (Array.isArray(action.payload)) {
-        state.cartItems = action.payload
-      } else {
-        const cartItem = action.payload
-        const existingItem = state.cartItems.find(i => i.id == cartItem.id)
-        if (existingItem) {
-          existingItem.quantity += cartItem.quantity
+        state.cartItems = action.payload.map(i => ({
+          ...i,
+          id: String(i.id || i._id || (i.item && (i.item._id || i.item)) || ""),
+          _id: String(i._id || i.id || (i.item && (i.item._id || i.item)) || ""),
+          price: Number(i.price) || 0,
+          quantity: Number(i.quantity) || 1
+        }))
+      } else if (action.payload) {
+        const rawId = action.payload.id || action.payload._id || (action.payload.item && (action.payload.item._id || action.payload.item)) || ""
+        const cartItem = {
+          ...action.payload,
+          id: String(rawId),
+          _id: String(rawId),
+          price: Number(action.payload.price) || 0,
+          quantity: Number(action.payload.quantity) || 1
+        }
+        const existingIndex = state.cartItems.findIndex(
+          i => (i.id && i.id === cartItem.id) || (i._id && i._id === cartItem._id)
+        )
+        if (existingIndex > -1) {
+          state.cartItems[existingIndex].quantity += cartItem.quantity
         } else {
           state.cartItems.push(cartItem)
         }
       }
-      state.totalAmount = state.cartItems.reduce((sum, i) => sum + i.price * i.quantity, 0)
+      state.totalAmount = state.cartItems.reduce((sum, i) => sum + (i.price || 0) * (i.quantity || 0), 0)
     },
 
     setTotalAmount: (state, action) => {
@@ -58,28 +80,52 @@ const userSlice = createSlice({
 
     updateQuantity: (state, action) => {
       if (Array.isArray(action.payload)) {
-        state.cartItems = action.payload
-      } else {
+        state.cartItems = action.payload.map(i => ({
+          ...i,
+          id: String(i.id || i._id || (i.item && (i.item._id || i.item)) || ""),
+          _id: String(i._id || i.id || (i.item && (i.item._id || i.item)) || ""),
+          price: Number(i.price) || 0,
+          quantity: Number(i.quantity) || 1
+        }))
+      } else if (action.payload) {
         const { id, quantity } = action.payload
+        const targetId = String(id || "").trim()
+        if (!targetId || targetId === "undefined" || targetId === "null") return
+
         if (quantity <= 0) {
-          state.cartItems = state.cartItems.filter(i => i.id != id)
+          state.cartItems = state.cartItems.filter(
+            i => String(i.id || i._id) !== targetId
+          )
         } else {
-          const item = state.cartItems.find(i => i.id == id)
+          const item = state.cartItems.find(
+            i => String(i.id || i._id) === targetId
+          )
           if (item) {
-            item.quantity = quantity
+            item.quantity = Number(quantity)
           }
         }
       }
-      state.totalAmount = state.cartItems.reduce((sum, i) => sum + i.price * i.quantity, 0)
+      state.totalAmount = state.cartItems.reduce((sum, i) => sum + (i.price || 0) * (i.quantity || 0), 0)
     },
 
     removeCartItem: (state, action) => {
       if (Array.isArray(action.payload)) {
-        state.cartItems = action.payload
-      } else {
-        state.cartItems = state.cartItems.filter(i => i.id !== action.payload)
+        state.cartItems = action.payload.map(i => ({
+          ...i,
+          id: String(i.id || i._id || (i.item && (i.item._id || i.item)) || ""),
+          _id: String(i._id || i.id || (i.item && (i.item._id || i.item)) || ""),
+          price: Number(i.price) || 0,
+          quantity: Number(i.quantity) || 1
+        }))
+      } else if (action.payload) {
+        const targetId = String(action.payload).trim()
+        if (targetId && targetId !== "undefined" && targetId !== "null") {
+          state.cartItems = state.cartItems.filter(
+            i => String(i.id || i._id) !== targetId
+          )
+        }
       }
-      state.totalAmount = state.cartItems.reduce((sum, i) => sum + i.price * i.quantity, 0)
+      state.totalAmount = state.cartItems.reduce((sum, i) => sum + (i.price || 0) * (i.quantity || 0), 0)
     },
 
     clearCart: (state) => {
