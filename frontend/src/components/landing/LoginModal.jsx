@@ -117,6 +117,9 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
       setLoading(true);
       setErr('');
       const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
       const result = await signInWithPopup(auth, provider);
       const { data } = await axios.post(
         `${serverUrl}/api/auth/google-auth`,
