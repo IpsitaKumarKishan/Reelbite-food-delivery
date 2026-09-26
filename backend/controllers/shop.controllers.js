@@ -34,7 +34,7 @@ export const getMyShop=async (req,res) => {
             options:{sort:{updatedAt:-1}}
         }).lean()
         if(!shop){
-            return res.status(404).json({ message: "Shop not found. Create one first." })
+            return res.status(200).json(null)
         }
         return res.status(200).json(shop)
     } catch (error) {
