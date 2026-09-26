@@ -4,6 +4,7 @@ const userSlice = createSlice({
   name: "user",
   initialState: {
     userData: null,
+    authChecked: false,
     currentCity: null,
     currentState: null,
     currentAddress: null,
@@ -16,7 +17,11 @@ const userSlice = createSlice({
   },
   reducers: {
     setUserData: (state, action) => {
-      state.userData = action.payload
+      state.userData = action.payload;
+      state.authChecked = true;
+    },
+    setAuthChecked: (state, action) => {
+      state.authChecked = action.payload;
     },
     setCurrentCity: (state, action) => {
       state.currentCity = action.payload
@@ -179,5 +184,5 @@ const userSlice = createSlice({
   }
 })
 
-export const { setUserData, setCurrentAddress, setCurrentCity, setCurrentState, setShopsInMyCity, setItemsInMyCity, setCartItems, addToCart, updateQuantity, removeCartItem, clearCart, setMyOrders, addMyOrder, updateOrderStatus, setSearchItems, setTotalAmount, updateRealtimeOrderStatus, updateUserDietPreference, updateUserPreferredCuisines } = userSlice.actions
+export const { setUserData, setAuthChecked, setCurrentAddress, setCurrentCity, setCurrentState, setShopsInMyCity, setItemsInMyCity, setCartItems, addToCart, updateQuantity, removeCartItem, clearCart, setMyOrders, addMyOrder, updateOrderStatus, setSearchItems, setTotalAmount, updateRealtimeOrderStatus, updateUserDietPreference, updateUserPreferredCuisines } = userSlice.actions
 export default userSlice.reducer

@@ -82,7 +82,11 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
       );
       dispatch(setUserData(result.data));
       onClose();
-      navigate('/');
+      if (result.data?.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     } catch (error) {
       setErr(error?.response?.data?.message || 'Failed to sign in. Please check your credentials.');
     } finally {
@@ -104,7 +108,11 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
       );
       dispatch(setUserData(result.data));
       onClose();
-      navigate('/');
+      if (result.data?.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     } catch (error) {
       setErr(error?.response?.data?.message || 'Failed to create account. Please try again.');
     } finally {
@@ -133,7 +141,11 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
       );
       dispatch(setUserData(data));
       onClose();
-      navigate('/');
+      if (data?.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     } catch (error) {
       console.error(error);
       setErr(error?.response?.data?.message || 'Google authentication failed.');

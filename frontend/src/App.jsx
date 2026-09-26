@@ -46,8 +46,16 @@ function AuthenticatedDataLoader() {
 }
 
 function App() {
-  const { userData } = useSelector(state => state.user)
+  const { userData, authChecked } = useSelector(state => state.user)
   useGetCurrentUser()
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-[#0c0a0f] flex flex-col items-center justify-center gap-3">
+        <div className="w-8 h-8 border-2 border-stone-700 border-t-[#ff5200] rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <>

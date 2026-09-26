@@ -48,7 +48,11 @@ function SignIn() {
       dispatch(setUserData(result.data));
       setErr('');
       setLoading(false);
-      navigate('/');
+      if (result.data?.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     } catch (error) {
       setErr(error?.response?.data?.message || 'Failed to sign in. Please check your credentials.');
       setLoading(false);
@@ -76,7 +80,11 @@ function SignIn() {
       );
       dispatch(setUserData(data));
       setLoading(false);
-      navigate('/');
+      if (data?.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     } catch (error) {
       console.error("Google Auth Error:", error);
       setErr(error?.response?.data?.message || (error?.code ? `${error.code}: ${error.message}` : error?.message) || 'Google Sign-In failed');
