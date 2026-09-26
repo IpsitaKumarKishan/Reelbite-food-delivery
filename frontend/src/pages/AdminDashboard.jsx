@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useSelector, useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Nav from "../components/Nav";
 import { serverUrl } from "../App";
 import { setUserData } from "../redux/userSlice";
@@ -28,19 +28,31 @@ import toast from "react-hot-toast";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const dispatch = useDispatch();
   const { userData } = useSelector((state) => state.user);
 
-  const [activeTab, setActiveTab] = useState("overview"); // overview, shops, users, disputes
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "overview"); // overview, shops, users, disputes
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState(null);
   const [shops, setShops] = useState([]);
-  const [shopFilter, setShopFilter] = useState("all");
+  const [shopFilter, setShopFilter] = useState(searchParams.get("filter") || "all");
   const [shopSearch, setShopSearch] = useState("");
   const [users, setUsers] = useState([]);
   const [userRoleFilter, setUserRoleFilter] = useState("all");
   const [userSearch, setUserSearch] = useState("");
   const [disputes, setDisputes] = useState([]);
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam && ["overview", "shops", "users", "disputes"].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+    const filterParam = searchParams.get("filter");
+    if (filterParam) {
+      setShopFilter(filterParam);
+    }
+  }, [searchParams]);
 
   // Fetch all admin data
   const fetchAllData = async () => {

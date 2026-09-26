@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaLocationDot, FaPlus, FaFilm, FaUtensils, FaMotorcycle, FaStore, FaHeart, FaGear, FaBell, FaChartLine, FaShieldHalved } from "react-icons/fa6";
+import { FaLocationDot, FaPlus, FaFilm, FaUtensils, FaMotorcycle, FaStore, FaHeart, FaGear, FaBell, FaChartLine, FaShieldHalved, FaCoins, FaUsers, FaTriangleExclamation } from "react-icons/fa6";
 import { IoIosSearch } from "react-icons/io";
 import { FiShoppingCart } from "react-icons/fi";
 import { useDispatch, useSelector } from 'react-redux';
@@ -15,11 +15,13 @@ import ProfileSettingsModal from './modals/ProfileSettingsModal';
 import SavedAddressesModal from './modals/SavedAddressesModal';
 import NotificationDropdown from './NotificationDropdown';
 import { useNotifications } from '../context/NotificationContext';
+import { useSocket } from '../context/SocketContext';
 
 function Nav() {
     const { userData, currentCity, cartItems } = useSelector(state => state.user);
     const { myShopData } = useSelector(state => state.owner || {});
     const { unreadCount } = useNotifications();
+    const { isConnected } = useSocket();
     const [showInfo, setShowInfo] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
@@ -27,10 +29,32 @@ function Nav() {
     const [showCuisineModal, setShowCuisineModal] = useState(false);
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [showAddressesModal, setShowAddressesModal] = useState(false);
+    const [adminBadges, setAdminBadges] = useState({
+        pendingShopsCount: 0,
+        unresolvedDisputesCount: 0,
+        unsettledPayoutsCount: 0,
+        totalAlerts: 0,
+    });
     const dropdownRef = useRef(null);
     const notifRef = useRef(null);
     const dispatch = useDispatch();
     const navigate = useNavigate();
+
+    useEffect(() => {
+        if (userData?.role === "admin") {
+            const fetchAdminBadges = async () => {
+                try {
+                    const res = await axios.get(`${serverUrl}/api/admin/quick-badges`, { withCredentials: true });
+                    if (res.data) setAdminBadges(res.data);
+                } catch (err) {
+                    // silent fallback
+                }
+            };
+            fetchAdminBadges();
+            const interval = setInterval(fetchAdminBadges, 25000);
+            return () => clearInterval(interval);
+        }
+    }, [userData?.role]);
 
     const handleLogOut = async () => {
         try {
@@ -132,10 +156,15 @@ function Nav() {
                 {userData?.role === "admin" && (
                     <button
                         onClick={() => navigate("/admin")}
-                        className="flex items-center gap-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-extrabold shadow-md hover:scale-105 transition"
+                        className="flex items-center gap-1.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-extrabold shadow-md hover:scale-105 transition"
                     >
                         <FaShieldHalved size={11} />
                         <span>Super Admin</span>
+                        {adminBadges.totalAlerts > 0 && (
+                            <span className="bg-amber-400 text-purple-950 text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none shadow-sm animate-pulse">
+                                {adminBadges.totalAlerts}
+                            </span>
+                        )}
                     </button>
                 )}
             </div>
@@ -270,30 +299,184 @@ function Nav() {
                 {userData ? (
                     <div className="relative" ref={dropdownRef}>
                         <div
-                            className='w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center bg-gradient-to-tr from-[#ff5200] to-amber-500 text-white text-xs sm:text-sm shadow-md font-extrabold cursor-pointer hover:scale-105 transition'
+                            className='w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center bg-gradient-to-tr from-[#ff5200] to-amber-500 text-white text-xs sm:text-sm shadow-md font-extrabold cursor-pointer hover:scale-105 transition relative'
                             onClick={() => setShowInfo(prev => !prev)}
                         >
                             {userData?.fullName?.slice(0, 1).toUpperCase()}
+                            {userData?.role === "admin" && adminBadges.totalAlerts > 0 && (
+                                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 border-2 border-white rounded-full flex items-center justify-center text-[9px] font-black text-white"></span>
+                            )}
                         </div>
 
                         {showInfo && (
-                            <div className='absolute top-12 right-0 w-64 bg-white border border-stone-200/90 shadow-2xl rounded-3xl p-3 flex flex-col gap-1 z-[9999] animate-in fade-in slide-in-from-top-2'>
+                            <div className={`absolute top-12 right-0 ${userData.role === "admin" ? "w-80" : "w-64"} bg-white border border-stone-200/90 shadow-2xl rounded-3xl p-3 flex flex-col gap-1.5 z-[9999] animate-in fade-in slide-in-from-top-2`}>
                                 {/* User Info Header */}
-                                <div className='p-2 rounded-2xl bg-stone-50 border border-stone-100 flex items-center gap-3'>
-                                    <div className='w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-tr from-[#ff5200] to-amber-500 text-white text-sm font-black shadow-sm shrink-0'>
-                                        {userData?.fullName?.slice(0, 1).toUpperCase()}
+                                {userData.role === "admin" ? (
+                                    <div className='p-3 rounded-2xl bg-gradient-to-br from-stone-900 via-purple-950 to-indigo-950 text-white border border-purple-500/30 shadow-md'>
+                                        <div className='flex items-center gap-3'>
+                                            <div className='w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-tr from-purple-500 to-indigo-500 text-white text-sm font-black shadow-inner border-2 border-purple-300 shrink-0'>
+                                                {userData?.fullName?.slice(0, 1).toUpperCase()}
+                                            </div>
+                                            <div className='min-w-0 flex-1'>
+                                                <div className='text-xs font-black text-white truncate'>{userData.fullName}</div>
+                                                <div className='text-[11px] text-purple-200/80 truncate'>{userData.email}</div>
+                                                <div className='inline-flex items-center gap-1 text-[9px] font-black text-purple-200 bg-purple-500/30 border border-purple-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider mt-1'>
+                                                    <FaShieldHalved size={9} />
+                                                    <span>Super Admin</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className='pt-2 mt-2 border-t border-purple-800/40 flex items-center justify-between text-[10px] text-purple-200/90'>
+                                            <div className='flex items-center gap-1.5'>
+                                                <span className={`w-2 h-2 rounded-full ${isConnected ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`}></span>
+                                                <span>{isConnected ? "Platform Socket Live" : "Reconnecting Gateway"}</span>
+                                            </div>
+                                            <span 
+                                                onClick={() => { setShowInfo(false); navigate("/admin?tab=overview"); }}
+                                                className='text-purple-300 font-bold hover:underline cursor-pointer'
+                                            >
+                                                Console ➔
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div className='min-w-0 flex-1'>
-                                        <div className='text-xs font-black text-stone-900 truncate'>{userData.fullName}</div>
-                                        <div className='text-[11px] text-stone-400 truncate'>{userData.email}</div>
-                                        <span className='inline-block text-[9px] font-black text-[#ff5200] bg-[#ff5200]/10 px-2 py-0.5 rounded-full uppercase tracking-wider mt-0.5'>
-                                            {userData.role}
-                                        </span>
+                                ) : (
+                                    <div className='p-2 rounded-2xl bg-stone-50 border border-stone-100 flex items-center gap-3'>
+                                        <div className='w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-tr from-[#ff5200] to-amber-500 text-white text-sm font-black shadow-sm shrink-0'>
+                                            {userData?.fullName?.slice(0, 1).toUpperCase()}
+                                        </div>
+                                        <div className='min-w-0 flex-1'>
+                                            <div className='text-xs font-black text-stone-900 truncate'>{userData.fullName}</div>
+                                            <div className='text-[11px] text-stone-400 truncate'>{userData.email}</div>
+                                            <span className='inline-block text-[9px] font-black text-[#ff5200] bg-[#ff5200]/10 px-2 py-0.5 rounded-full uppercase tracking-wider mt-0.5'>
+                                                {userData.role}
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
 
                                 {/* Section: Management & Orders */}
-                                <div className='pt-1.5 space-y-0.5'>
+                                <div className='pt-1 space-y-0.5'>
+                                    {userData.role === "admin" && (
+                                        <>
+                                            <div className='px-1 pt-0.5 pb-1 text-[10px] font-black uppercase tracking-wider text-purple-900 flex items-center justify-between'>
+                                                <span>Platform Governance</span>
+                                                {adminBadges.totalAlerts > 0 && (
+                                                    <span className='bg-red-100 text-red-700 text-[9px] px-1.5 py-0.5 rounded-full font-extrabold'>
+                                                        {adminBadges.totalAlerts} Alert{adminBadges.totalAlerts > 1 ? "s" : ""}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Command Overview */}
+                                            <div
+                                                className='text-xs font-bold text-purple-800 hover:text-purple-950 hover:bg-purple-50 rounded-2xl px-2.5 py-1.5 cursor-pointer flex items-center justify-between transition group'
+                                                onClick={() => { setShowInfo(false); navigate("/admin?tab=overview"); }}
+                                            >
+                                                <div className='flex items-center gap-2.5'>
+                                                    <div className='w-7 h-7 rounded-xl bg-purple-100 group-hover:bg-purple-600 group-hover:text-white text-purple-600 flex items-center justify-center transition shrink-0'>
+                                                        <FaShieldHalved size={12} />
+                                                    </div>
+                                                    <span>Command Overview</span>
+                                                </div>
+                                                <span className='text-[11px] text-purple-400 group-hover:text-purple-700'>➔</span>
+                                            </div>
+
+                                            {/* Restaurant Approvals */}
+                                            <div
+                                                className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-1.5 cursor-pointer flex items-center justify-between transition group'
+                                                onClick={() => { setShowInfo(false); navigate("/admin?tab=shops"); }}
+                                            >
+                                                <div className='flex items-center gap-2.5'>
+                                                    <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                                        <FaStore size={12} />
+                                                    </div>
+                                                    <span>Restaurant Approvals</span>
+                                                </div>
+                                                {adminBadges.pendingShopsCount > 0 ? (
+                                                    <span className='text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full'>
+                                                        {adminBadges.pendingShopsCount} pending
+                                                    </span>
+                                                ) : (
+                                                    <span className='text-[10px] font-medium text-stone-400'>All verified</span>
+                                                )}
+                                            </div>
+
+                                            {/* Payout Settlements */}
+                                            <div
+                                                className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-1.5 cursor-pointer flex items-center justify-between transition group'
+                                                onClick={() => { setShowInfo(false); navigate("/admin?tab=shops&filter=pending"); }}
+                                            >
+                                                <div className='flex items-center gap-2.5'>
+                                                    <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                                        <FaCoins size={12} />
+                                                    </div>
+                                                    <span>Vendor Settlements</span>
+                                                </div>
+                                                {adminBadges.unsettledPayoutsCount > 0 && (
+                                                    <span className='text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full'>
+                                                        {adminBadges.unsettledPayoutsCount} orders
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* User Roles & Staff */}
+                                            <div
+                                                className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-1.5 cursor-pointer flex items-center justify-between transition group'
+                                                onClick={() => { setShowInfo(false); navigate("/admin?tab=users"); }}
+                                            >
+                                                <div className='flex items-center gap-2.5'>
+                                                    <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                                        <FaUsers size={12} />
+                                                    </div>
+                                                    <span>User Roles & Staff</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Disputes & Refunds */}
+                                            <div
+                                                className='text-xs font-bold text-stone-700 hover:text-red-600 hover:bg-red-50/50 rounded-2xl px-2.5 py-1.5 cursor-pointer flex items-center justify-between transition group'
+                                                onClick={() => { setShowInfo(false); navigate("/admin?tab=disputes"); }}
+                                            >
+                                                <div className='flex items-center gap-2.5'>
+                                                    <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-red-600 group-hover:text-white text-red-600 flex items-center justify-center transition shrink-0'>
+                                                        <FaTriangleExclamation size={12} />
+                                                    </div>
+                                                    <span>Disputes & Refunds</span>
+                                                </div>
+                                                {adminBadges.unresolvedDisputesCount > 0 && (
+                                                    <span className='text-[10px] font-black bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded-full animate-pulse'>
+                                                        {adminBadges.unresolvedDisputesCount} active
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Operations & Analytics */}
+                                            <div className='border-t border-stone-100 pt-1.5 mt-1'>
+                                                <div className='px-1 pb-1 text-[10px] font-black uppercase tracking-wider text-stone-400'>
+                                                    Operations & Analytics
+                                                </div>
+                                                <div
+                                                    className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-1.5 cursor-pointer flex items-center gap-2.5 transition group'
+                                                    onClick={() => { setShowInfo(false); navigate("/owner/analytics"); }}
+                                                >
+                                                    <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                                        <FaChartLine size={12} />
+                                                    </div>
+                                                    <span>Kitchen Analytics</span>
+                                                </div>
+                                                <div
+                                                    className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-1.5 cursor-pointer flex items-center gap-2.5 transition group'
+                                                    onClick={() => { setShowInfo(false); navigate("/my-orders"); }}
+                                                >
+                                                    <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                                        <TbReceipt2 size={13} />
+                                                    </div>
+                                                    <span>All Platform Orders</span>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+
                                     {userData.role === "owner" && (
                                         <>
                                             <div
@@ -331,38 +514,6 @@ function Nav() {
                                                     <TbReceipt2 size={14} />
                                                 </div>
                                                 <span>Restaurant Orders</span>
-                                            </div>
-                                        </>
-                                    )}
-
-                                    {userData.role === "admin" && (
-                                        <>
-                                            <div
-                                                className='text-xs font-bold text-purple-700 hover:text-purple-900 hover:bg-purple-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
-                                                onClick={() => { setShowInfo(false); navigate("/admin"); }}
-                                            >
-                                                <div className='w-7 h-7 rounded-xl bg-purple-100 group-hover:bg-purple-600 group-hover:text-white text-purple-600 flex items-center justify-center transition shrink-0'>
-                                                    <FaShieldHalved size={13} />
-                                                </div>
-                                                <span>Super Admin Center</span>
-                                            </div>
-                                            <div
-                                                className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
-                                                onClick={() => { setShowInfo(false); navigate("/owner/analytics"); }}
-                                            >
-                                                <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
-                                                    <FaChartLine size={13} />
-                                                </div>
-                                                <span>Kitchen Analytics</span>
-                                            </div>
-                                            <div
-                                                className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
-                                                onClick={() => { setShowInfo(false); navigate("/my-orders"); }}
-                                            >
-                                                <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
-                                                    <TbReceipt2 size={14} />
-                                                </div>
-                                                <span>All Orders</span>
                                             </div>
                                         </>
                                     )}

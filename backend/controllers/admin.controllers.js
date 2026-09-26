@@ -350,3 +350,35 @@ export const settleShopPayout = async (req, res) => {
     return res.status(500).json({ message: `settleShopPayout error: ${error.message || error}` });
   }
 };
+
+/**
+ * GET /api/admin/quick-badges
+ * Returns lightweight summary counts for Admin header/profile navigation badges.
+ */
+export const getQuickBadges = async (req, res) => {
+  try {
+    const [pendingShops, pendingRefunds, unsettledPayouts] = await Promise.all([
+      Shop.countDocuments({ status: "pending" }),
+      Order.countDocuments({
+        "cancellation.isCancelled": true,
+        "refund.status": { $in: ["initiated", "failed"] },
+      }),
+      Order.countDocuments({
+        "shopOrders.status": "delivered",
+        "shopOrders.settlementStatus": "unsettled",
+      }),
+    ]);
+
+    const disputesCount = pendingRefunds > 0 ? pendingRefunds : await Order.countDocuments({ "cancellation.isCancelled": true });
+
+    return res.status(200).json({
+      pendingShopsCount: pendingShops,
+      unresolvedDisputesCount: disputesCount,
+      unsettledPayoutsCount: unsettledPayouts,
+      totalAlerts: pendingShops + disputesCount,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: `getQuickBadges error: ${error.message || error}` });
+  }
+};
+
