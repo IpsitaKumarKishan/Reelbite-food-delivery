@@ -63,7 +63,7 @@ function App() {
         <Route path='/liked-reels' element={userData ? <LikedReels/> : <Navigate to={"/signin"}/>}/>
         <Route path='/owner/reels' element={userData && userData.role === "owner" ? <OwnerReels/> : <Navigate to={"/"}/>}/>
         <Route path='/owner/analytics' element={userData && (userData.role === "owner" || userData.role === "admin") ? <OwnerAnalytics/> : <Navigate to={"/signin"}/>}/>
-        <Route path='/admin' element={userData ? <AdminDashboard/> : <Navigate to={"/signin"}/>}/>
+        <Route path='/admin' element={userData && userData.role === "admin" ? <AdminDashboard/> : <Navigate to={"/"}/>}/>
         <Route path='/create-edit-shop' element={userData ? <CreateEditShop/> : <Navigate to={"/signin"}/>}/>
         <Route path='/add-item' element={userData ? <AddItem/> : <Navigate to={"/signin"}/>}/>
         <Route path='/edit-item/:itemId' element={userData ? <EditItem/> : <Navigate to={"/signin"}/>}/>

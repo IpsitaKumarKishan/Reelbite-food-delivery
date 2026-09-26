@@ -70,12 +70,14 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    if (userData?.role === "admin") {
-      fetchAllData();
-    } else {
-      setLoading(false);
+    if (userData) {
+      if (userData.role === "admin") {
+        fetchAllData();
+      } else {
+        navigate("/");
+      }
     }
-  }, [userData]);
+  }, [userData, navigate]);
 
   // Handler to toggle shop status
   const handleUpdateShopStatus = async (shopId, newStatus) => {
@@ -129,45 +131,9 @@ export default function AdminDashboard() {
     }
   };
 
-  // If user is not admin, show elevation prompt
+  // If user is not admin, immediately redirect to home
   if (userData?.role !== "admin") {
-    return (
-      <div className="min-h-screen bg-[#faf8f5] text-stone-900 pb-20">
-        <Nav />
-        <div className="max-w-lg mx-auto pt-36 px-4 text-center">
-          <div className="w-20 h-20 bg-amber-100 rounded-3xl flex items-center justify-center mx-auto text-[#ff5200] mb-5 shadow-inner">
-            <FaShieldHalved size={36} />
-          </div>
-          <h2 className="text-2xl font-black text-stone-900 tracking-tight">Super Admin Restricted Portal</h2>
-          <p className="text-stone-500 text-sm mt-2 mb-6">
-            This area is restricted to platform operators with governance privileges (financials, shop verification, and disputes).
-          </p>
-          <div className="bg-white p-5 rounded-3xl border border-stone-200 text-left space-y-3 mb-6 shadow-sm">
-            <p className="text-xs font-bold text-stone-600">
-              Current User: <span className="text-stone-900">{userData?.fullName}</span> ({userData?.email})
-            </p>
-            <p className="text-xs font-bold text-stone-600">
-              Role: <span className="uppercase text-[#ff5200]">{userData?.role}</span>
-            </p>
-            <p className="text-[11px] text-stone-400">
-              To test the Super Admin Dashboard, click below to assign yourself the <code>admin</code> role.
-            </p>
-            <button
-              onClick={() => handleUpdateRole(userData?._id, "admin")}
-              className="w-full bg-gradient-to-r from-[#ff5200] to-amber-500 text-white font-extrabold py-2.5 rounded-xl text-xs shadow hover:shadow-orange-500/25 transition active:scale-95"
-            >
-              Elevate My Account to Super Admin
-            </button>
-          </div>
-          <button
-            onClick={() => navigate("/")}
-            className="text-xs font-bold text-stone-500 hover:text-stone-800"
-          >
-            ← Return to Home
-          </button>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   // Filtered Shops
