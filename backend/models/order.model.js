@@ -22,10 +22,10 @@ const shopOrderSchema = new mongoose.Schema({
     },
     subtotal: Number,
     shopOrderItems: [shopOrderItemSchema],
-    status:{
-        type:String,
-        enum:["pending","preparing","out of delivery","delivered"],
-        default:"pending"
+    status: {
+        type: String,
+        enum: ["pending", "preparing", "out of delivery", "delivered", "cancelled"],
+        default: "pending"
     },
   assignment:{
      type: mongoose.Schema.Types.ObjectId,
@@ -82,6 +82,22 @@ const orderSchema = new mongoose.Schema({
     platformRevenue: { type: Number, default: 0 },
     settlementStatus: { type: String, enum: ["unsettled", "settled"], default: "unsettled" },
     shopOrders: [shopOrderSchema],
+    coupon: {
+        code: { type: String, default: null },
+        discountAmount: { type: Number, default: 0 }
+    },
+    cancellation: {
+        isCancelled: { type: Boolean, default: false },
+        cancelledBy: { type: String, enum: ["customer", "owner", "admin"], default: null },
+        reason: { type: String, default: null },
+        cancelledAt: { type: Date, default: null }
+    },
+    refund: {
+        refundId: { type: String, default: null },
+        amount: { type: Number, default: 0 },
+        status: { type: String, enum: ["none", "initiated", "processed", "failed"], default: "none" },
+        notes: { type: String, default: null }
+    },
     payment:{
         type:Boolean,
         default:false

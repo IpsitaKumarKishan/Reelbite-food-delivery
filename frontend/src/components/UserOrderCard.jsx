@@ -92,13 +92,31 @@ function UserOrderCard({ data }) {
                 </div>
             ))}
 
+            {/* Coupon and Refund Information */}
+            {(data.coupon?.code || data.refund?.status === "initiated" || data.cancellation?.isCancelled) && (
+                <div className='flex flex-wrap items-center gap-2 pt-1'>
+                    {data.cancellation?.isCancelled && (
+                        <span className='text-[11px] font-bold bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full'>
+                            Cancelled
+                        </span>
+                    )}
+                    {data.coupon?.code && (
+                        <span className='text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full'>
+                            Coupon: {data.coupon.code} (-₹{data.coupon.discountAmount})
+                        </span>
+                    )}
+                    {data.refund?.status === "initiated" && (
+                        <span className='text-[11px] font-bold bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full'>
+                            ₹{data.refund.amount} Refund Initiated
+                        </span>
+                    )}
+                </div>
+            )}
+
             <div className='flex justify-between items-center border-t pt-2'>
                 <p className='font-semibold'>Total: ₹{data.totalAmount}</p>
                 <button className='bg-[#ff4d2d] hover:bg-[#e64526] text-white px-4 py-2 rounded-lg text-sm' onClick={() => navigate(`/track-order/${data._id}`)}>Track Order</button>
             </div>
-
-
-
         </div>
     )
 }

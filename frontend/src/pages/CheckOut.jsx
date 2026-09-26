@@ -14,6 +14,7 @@ import { FaMobileScreenButton } from "react-icons/fa6";
 import { useNavigate } from 'react-router-dom';
 import { serverUrl } from '../App';
 import { addMyOrder, clearCart, setTotalAmount } from '../redux/userSlice';
+import CouponSection from '../components/CouponSection';
 
 function RecenterMap({ location }) {
   const map = useMap()
@@ -27,14 +28,17 @@ function RecenterMap({ location }) {
 
 function CheckOut() {
   const { location, address } = useSelector(state => state.map)
-    const { cartItems ,totalAmount,userData} = useSelector(state => state.user)
+  const { cartItems, totalAmount, userData } = useSelector(state => state.user)
   const [addressInput, setAddressInput] = useState("")
   const [paymentMethod, setPaymentMethod] = useState("cod")
-  const navigate=useNavigate()
+  const [appliedCoupon, setAppliedCoupon] = useState(null)
+  const navigate = useNavigate()
   const dispatch = useDispatch()
   const apiKey = import.meta.env.VITE_GEOAPIKEY
-  const deliveryFee=totalAmount>500?0:40
-  const AmountWithDeliveryFee=totalAmount+deliveryFee
+  const discountAmount = appliedCoupon ? appliedCoupon.discountAmount : 0
+  const subtotalAfterDiscount = Math.max(0, totalAmount - discountAmount)
+  const deliveryFee = totalAmount > 500 ? 0 : 40
+  const AmountWithDeliveryFee = subtotalAfterDiscount + deliveryFee
 
 
 
@@ -85,7 +89,8 @@ function CheckOut() {
           longitude:location.lon
         },
         totalAmount:AmountWithDeliveryFee,
-        cartItems
+        cartItems,
+        couponCode: appliedCoupon?.code || null
       },{withCredentials:true})
 
       if(paymentMethod=="cod"){
@@ -210,6 +215,14 @@ const openRazorpayWindow=(orderId,razorOrder)=>{
           </div>
         </section>
 
+        {/* Coupons & Promo Codes Section */}
+        <CouponSection
+          subtotal={totalAmount}
+          appliedCoupon={appliedCoupon}
+          onApplyCoupon={(c) => setAppliedCoupon(c)}
+          onRemoveCoupon={() => setAppliedCoupon(null)}
+        />
+
         <section>
           <h2 className='text-lg font-semibold mb-3 text-gray-800'>Order Summary</h2>
 <div className='rounded-xl border bg-gray-50 p-4 space-y-2'>
@@ -225,6 +238,12 @@ const openRazorpayWindow=(orderId,razorOrder)=>{
   <span>Subtotal</span>
   <span>₹{totalAmount}</span>
 </div>
+{appliedCoupon && (
+  <div className='flex justify-between text-emerald-600 font-semibold text-sm'>
+    <span>Coupon Discount ({appliedCoupon.code})</span>
+    <span>-₹{appliedCoupon.discountAmount}</span>
+  </div>
+)}
 <div className='flex justify-between text-gray-700 text-sm'>
   <span>Delivery Fee</span>
   <span>{deliveryFee==0?"Free":`₹${deliveryFee}`}</span>

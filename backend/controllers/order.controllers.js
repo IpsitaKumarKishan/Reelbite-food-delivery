@@ -2,6 +2,7 @@ import DeliveryAssignment from "../models/deliveryAssignment.model.js"
 import Order from "../models/order.model.js"
 import Shop from "../models/shop.model.js"
 import User from "../models/user.model.js"
+import Coupon from "../models/coupon.model.js"
 import { sendDeliveryOtpMail } from "../utils/mail.js"
 import RazorPay from "razorpay"
 import dotenv from "dotenv"
@@ -15,7 +16,7 @@ let instance = new RazorPay({
 
 export const placeOrder = async (req, res) => {
     try {
-        const { cartItems, paymentMethod, deliveryAddress, totalAmount } = req.body
+        const { cartItems, paymentMethod, deliveryAddress, totalAmount, couponCode } = req.body
         if (cartItems.length == 0 || !cartItems) {
             return res.status(400).json({ message: "cart is empty" })
         }
@@ -66,9 +67,36 @@ export const placeOrder = async (req, res) => {
 
         const calculatedSplit = computeOrderSplit({ shopOrders }, shopCommissionRates);
 
+        // Coupon discount validation
+        let couponData = { code: null, discountAmount: 0 };
+        let matchedCoupon = null;
+        if (couponCode && typeof couponCode === "string" && couponCode.trim()) {
+            const foundCoupon = await Coupon.findOne({ code: couponCode.trim().toUpperCase(), isActive: true });
+            if (foundCoupon && foundCoupon.validUntil >= new Date()) {
+                const meetsMin = !foundCoupon.minOrderValue || calculatedSplit.subtotal >= foundCoupon.minOrderValue;
+                const timesUsed = foundCoupon.usedBy?.filter(u => u.user && u.user.toString() === req.userId.toString()).length || 0;
+                const withinLimit = timesUsed < (foundCoupon.usageLimitPerUser || 1);
+
+                if (meetsMin && withinLimit) {
+                    let discount = 0;
+                    if (foundCoupon.discountType === "flat") {
+                        discount = Math.min(foundCoupon.discountValue, calculatedSplit.subtotal);
+                    } else if (foundCoupon.discountType === "percentage") {
+                        const calc = Math.round((calculatedSplit.subtotal * foundCoupon.discountValue) / 100);
+                        discount = foundCoupon.maxDiscount ? Math.min(calc, foundCoupon.maxDiscount) : calc;
+                    }
+                    discount = Math.min(discount, calculatedSplit.subtotal);
+                    couponData = { code: foundCoupon.code, discountAmount: discount };
+                    matchedCoupon = foundCoupon;
+                }
+            }
+        }
+
+        const payableTotal = Math.max(0, (calculatedSplit.subtotal - couponData.discountAmount) + calculatedSplit.deliveryFee + calculatedSplit.platformFee);
+
         if (paymentMethod == "online") {
             const razorOrder = await instance.orders.create({
-                amount: Math.round(totalAmount * 100),
+                amount: Math.round(payableTotal * 100),
                 currency: 'INR',
                 receipt: `receipt_${Date.now()}`
             })
@@ -76,7 +104,7 @@ export const placeOrder = async (req, res) => {
                 user: req.userId,
                 paymentMethod,
                 deliveryAddress,
-                totalAmount,
+                totalAmount: payableTotal,
                 subtotal: calculatedSplit.subtotal,
                 deliveryFee: calculatedSplit.deliveryFee,
                 platformFee: calculatedSplit.platformFee,
@@ -86,9 +114,15 @@ export const placeOrder = async (req, res) => {
                 platformRevenue: calculatedSplit.platformRevenue,
                 settlementStatus: "unsettled",
                 shopOrders: calculatedSplit.shopOrders,
+                coupon: couponData,
                 razorpayOrderId: razorOrder.id,
                 payment: false
             })
+
+            if (matchedCoupon) {
+                matchedCoupon.usedBy.push({ user: req.userId, order: newOrder._id });
+                await matchedCoupon.save();
+            }
 
             return res.status(200).json({
                 razorOrder,
@@ -101,7 +135,7 @@ export const placeOrder = async (req, res) => {
             user: req.userId,
             paymentMethod,
             deliveryAddress,
-            totalAmount,
+            totalAmount: payableTotal,
             subtotal: calculatedSplit.subtotal,
             deliveryFee: calculatedSplit.deliveryFee,
             platformFee: calculatedSplit.platformFee,
@@ -110,8 +144,14 @@ export const placeOrder = async (req, res) => {
             deliveryPartnerPayout: calculatedSplit.deliveryPartnerPayout,
             platformRevenue: calculatedSplit.platformRevenue,
             settlementStatus: "unsettled",
-            shopOrders: calculatedSplit.shopOrders
+            shopOrders: calculatedSplit.shopOrders,
+            coupon: couponData
         })
+
+        if (matchedCoupon) {
+            matchedCoupon.usedBy.push({ user: req.userId, order: newOrder._id });
+            await matchedCoupon.save();
+        }
 
         await newOrder.populate("shopOrders.shopOrderItems.item", "name image price")
         await newOrder.populate("shopOrders.shop", "name")
@@ -685,5 +725,194 @@ export const getTodayDeliveries=async (req,res) => {
     } catch (error) {
         return res.status(500).json({ message: `today deliveries error ${error}` }) 
     }
-
 }
+
+/**
+ * POST /api/order/cancel/:orderId
+ * Customer cancellation within 120s window or while all shopOrders are pending
+ * Automatically initiates Razorpay refund if paid online
+ */
+export const cancelOrder = async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const { reason = "Customer requested cancellation" } = req.body;
+        const userId = req.userId;
+
+        const order = await Order.findById(orderId)
+            .populate("shopOrders.owner", "socketId name")
+            .populate("user");
+
+        if (!order) {
+            return res.status(404).json({ message: "Order not found" });
+        }
+
+        const orderUserId = order.user?._id ? order.user._id.toString() : order.user?.toString();
+        if (orderUserId !== userId.toString()) {
+            return res.status(403).json({ message: "You are not authorized to cancel this order" });
+        }
+
+        if (order.cancellation?.isCancelled) {
+            return res.status(400).json({ message: "Order is already cancelled" });
+        }
+
+        // Cancellation Window: Allowed within 120s OR if all shop orders are strictly pending
+        const placedTime = new Date(order.createdAt).getTime();
+        const elapsedSeconds = (Date.now() - placedTime) / 1000;
+        const anyStarted = order.shopOrders.some(so => ["preparing", "out of delivery", "delivered"].includes(so.status));
+
+        if (anyStarted && elapsedSeconds > 120) {
+            return res.status(400).json({
+                message: "Order cannot be cancelled. The kitchen has already started preparing your food."
+            });
+        }
+
+        // Handle automated refund if online payment was captured
+        let refundInfo = { refundId: null, amount: 0, status: "none", notes: null };
+        if (order.paymentMethod === "online" && order.payment && order.razorpayPaymentId) {
+            try {
+                const refundAmountInPaise = Math.round(order.totalAmount * 100);
+                const razorRefund = await instance.payments.refund(order.razorpayPaymentId, {
+                    amount: refundAmountInPaise,
+                    notes: { reason, orderId: order._id.toString() }
+                });
+
+                refundInfo = {
+                    refundId: razorRefund.id,
+                    amount: order.totalAmount,
+                    status: "initiated",
+                    notes: `Refund of ₹${order.totalAmount} initiated via Razorpay (ID: ${razorRefund.id})`
+                };
+            } catch (refundError) {
+                console.error("Razorpay refund error:", refundError.message || refundError);
+                refundInfo = {
+                    refundId: null,
+                    amount: order.totalAmount,
+                    status: "failed",
+                    notes: `Automated refund failed: ${refundError.message}. Customer support will process manually.`
+                };
+            }
+        }
+
+        // Update all shop order statuses to cancelled
+        order.shopOrders.forEach(so => {
+            so.status = "cancelled";
+        });
+
+        order.cancellation = {
+            isCancelled: true,
+            cancelledBy: "customer",
+            reason,
+            cancelledAt: new Date()
+        };
+        order.refund = refundInfo;
+
+        await order.save();
+
+        // Cancel any pending delivery assignments
+        await DeliveryAssignment.updateMany(
+            { order: order._id },
+            { status: "cancelled" }
+        );
+
+        // Notify restaurant owners via Socket
+        const io = req.app.get("io");
+        if (io) {
+            order.shopOrders.forEach(so => {
+                if (so.owner?.socketId) {
+                    io.to(so.owner.socketId).emit("orderCancelled", {
+                        orderId: order._id,
+                        shopId: so.shop,
+                        reason
+                    });
+                }
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: refundInfo.status === "initiated"
+                ? `Order cancelled. Refund of ₹${order.totalAmount} has been initiated to your original payment method.`
+                : "Order cancelled successfully.",
+            order
+        });
+
+    } catch (error) {
+        console.error("cancelOrder error:", error);
+        return res.status(500).json({ message: `Cancel order error: ${error.message}` });
+    }
+};
+
+/**
+ * POST /api/order/reject/:orderId/:shopId
+ * Restaurant owner rejects an order item/sub-order
+ */
+export const rejectShopOrder = async (req, res) => {
+    try {
+        const { orderId, shopId } = req.params;
+        const { reason = "Restaurant unable to prepare dish" } = req.body;
+        const ownerId = req.userId;
+
+        const order = await Order.findById(orderId).populate("user");
+        if (!order) return res.status(404).json({ message: "Order not found" });
+
+        const shopOrder = order.shopOrders.find(so => so.shop?.toString() === shopId.toString());
+        if (!shopOrder) return res.status(404).json({ message: "Shop order not found" });
+
+        if (shopOrder.owner?.toString() !== ownerId.toString()) {
+            return res.status(403).json({ message: "Unauthorized: not your shop order" });
+        }
+
+        shopOrder.status = "cancelled";
+
+        const allCancelled = order.shopOrders.every(so => so.status === "cancelled");
+        if (allCancelled) {
+            order.cancellation = {
+                isCancelled: true,
+                cancelledBy: "owner",
+                reason,
+                cancelledAt: new Date()
+            };
+        }
+
+        // Automatic refund if online payment was made
+        if (order.paymentMethod === "online" && order.payment && order.razorpayPaymentId) {
+            try {
+                const refundAmount = allCancelled ? order.totalAmount : shopOrder.subtotal;
+                const razorRefund = await instance.payments.refund(order.razorpayPaymentId, {
+                    amount: Math.round(refundAmount * 100),
+                    notes: { reason, shopId, orderId: order._id.toString() }
+                });
+
+                order.refund = {
+                    refundId: razorRefund.id,
+                    amount: (order.refund?.amount || 0) + refundAmount,
+                    status: "initiated",
+                    notes: `Refund of ₹${refundAmount} initiated due to kitchen rejection`
+                };
+            } catch (refundError) {
+                console.error("Refund error during shop rejection:", refundError.message || refundError);
+            }
+        }
+
+        await order.save();
+
+        const io = req.app.get("io");
+        if (io && order.user?.socketId) {
+            io.to(order.user.socketId).emit("orderRejected", {
+                orderId: order._id,
+                shopId,
+                reason
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Shop order rejected and refund recorded",
+            order
+        });
+
+    } catch (error) {
+        console.error("rejectShopOrder error:", error);
+        return res.status(500).json({ message: `Reject shop order error: ${error.message}` });
+    }
+};

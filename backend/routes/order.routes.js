@@ -2,7 +2,7 @@ import express from "express"
 import { body } from "express-validator"
 import validate from "../middlewares/validate.js"
 import isAuth from "../middlewares/isAuth.js"
-import { acceptOrder, getCurrentOrder, getDeliveryBoyAssignment, getMyOrders, getOrderById, getTodayDeliveries, placeOrder, sendDeliveryOtp, updateOrderStatus, verifyDeliveryOtp, verifyPayment } from "../controllers/order.controllers.js"
+import { acceptOrder, cancelOrder, getCurrentOrder, getDeliveryBoyAssignment, getMyOrders, getOrderById, getTodayDeliveries, placeOrder, rejectShopOrder, sendDeliveryOtp, updateOrderStatus, verifyDeliveryOtp, verifyPayment } from "../controllers/order.controllers.js"
 
 const orderRouter=express.Router()
 
@@ -51,5 +51,7 @@ orderRouter.post("/update-status/:orderId/:shopId",isAuth,updateOrderStatus)
 orderRouter.get('/accept-order/:assignmentId',isAuth,acceptOrder)
 orderRouter.get('/get-order-by-id/:orderId',isAuth,getOrderById)
 orderRouter.get('/get-today-deliveries',isAuth,getTodayDeliveries)
+orderRouter.post('/cancel/:orderId', isAuth, cancelOrder)
+orderRouter.post('/reject/:orderId/:shopId', isAuth, rejectShopOrder)
 
 export default orderRouter

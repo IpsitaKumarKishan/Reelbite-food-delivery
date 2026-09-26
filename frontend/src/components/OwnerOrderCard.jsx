@@ -11,6 +11,13 @@ function OwnerOrderCard({ data }) {
 const dispatch=useDispatch()
     const handleUpdateStatus=async (orderId,shopId,status) => {
         try {
+            if (status === "cancelled") {
+                const reason = window.prompt("Reason for cancelling/rejecting this order:", "Item out of stock");
+                if (!reason) return;
+                await axios.post(`${serverUrl}/api/order/reject/${orderId}/${shopId}`, { reason }, { withCredentials: true });
+                dispatch(updateOrderStatus({ orderId, shopId, status: "cancelled" }));
+                return;
+            }
             const result=await axios.post(`${serverUrl}/api/order/update-status/${orderId}/${shopId}`,{status},{withCredentials:true})
              dispatch(updateOrderStatus({orderId,shopId,status}))
              setAvailableBoys(result.data.availableBoys)
@@ -48,15 +55,18 @@ const dispatch=useDispatch()
             </div>
 
 <div className='flex justify-between items-center mt-auto pt-3 border-t border-gray-100'>
-<span className='text-sm'>status: <span className='font-semibold capitalize text-[#ff4d2d]'>{data.shopOrders.status}</span>
+<span className='text-sm'>status: <span className={`font-semibold capitalize ${data.shopOrders.status === "cancelled" ? "text-red-600" : "text-[#ff4d2d]"}`}>{data.shopOrders.status}</span>
 </span>
 
-<select  className='rounded-md border px-3 py-1 text-sm focus:outline-none focus:ring-2 border-[#ff4d2d] text-[#ff4d2d]' onChange={(e)=>handleUpdateStatus(data._id,data.shopOrders.shop._id,e.target.value)}>
+{data.shopOrders.status !== "cancelled" && data.shopOrders.status !== "delivered" && (
+<select className='rounded-md border px-3 py-1 text-sm focus:outline-none focus:ring-2 border-[#ff4d2d] text-[#ff4d2d]' onChange={(e)=>handleUpdateStatus(data._id,data.shopOrders.shop._id,e.target.value)}>
     <option value="">Change</option>
 <option value="pending">Pending</option>
 <option value="preparing">Preparing</option>
 <option value="out of delivery">Out Of Delivery</option>
+<option value="cancelled">Reject / Cancel</option>
 </select>
+)}
 
 </div>
 
