@@ -1,8 +1,5 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Nav from './Nav';
-import { categories } from '../category';
-import CategoryCard from './CategoryCard';
-import { FaCircleChevronLeft, FaCircleChevronRight } from "react-icons/fa6";
 import { useSelector } from 'react-redux';
 import FoodCard from './FoodCard';
 import RestaurantCard from './RestaurantCard';
@@ -15,11 +12,7 @@ import SearchFilterBar from './SearchFilterBar';
 
 function UserDashboard() {
   const { currentCity, shopInMyCity, itemsInMyCity, searchItems, userData } = useSelector(state => state.user);
-  const cateScrollRef = useRef();
   const navigate = useNavigate();
-
-  const [showLeftCateButton, setShowLeftCateButton] = useState(false);
-  const [showRightCateButton, setShowRightCateButton] = useState(false);
   const [activeCategory, setActiveCategory] = useState("All");
 
   // Hook for personalized recommendations (Order Again & Time of Day)
@@ -115,34 +108,6 @@ function UserDashboard() {
     return shops;
   }, [shopInMyCity, filters.minRating]);
 
-  // Category scroll buttons handler
-  const updateButton = (ref, setLeftButton, setRightButton) => {
-    const element = ref.current;
-    if (element) {
-      setLeftButton(element.scrollLeft > 0);
-      setRightButton(element.scrollLeft + element.clientWidth < element.scrollWidth - 5);
-    }
-  };
-
-  const scrollHandler = (ref, direction) => {
-    if (ref.current) {
-      ref.current.scrollBy({
-        left: direction === "left" ? -250 : 250,
-        behavior: "smooth"
-      });
-    }
-  };
-
-  useEffect(() => {
-    if (cateScrollRef.current) {
-      updateButton(cateScrollRef, setShowLeftCateButton, setShowRightCateButton);
-      const cateElem = cateScrollRef.current;
-      const onCateScroll = () => updateButton(cateScrollRef, setShowLeftCateButton, setShowRightCateButton);
-      cateElem?.addEventListener('scroll', onCateScroll);
-      return () => cateElem?.removeEventListener('scroll', onCateScroll);
-    }
-  }, [categories]);
-
   return (
     <div className='w-full min-h-screen flex flex-col bg-[#f8f9fa] text-stone-900 font-sans pb-20 md:pb-12'>
       {/* Top Navbar */}
@@ -170,56 +135,6 @@ function UserDashboard() {
         {orderAgain && orderAgain.length > 0 && (
           <OrderAgainCarousel items={orderAgain} />
         )}
-
-        {/* Cuisine / Category Scrollable Chip Row */}
-        <section className="space-y-3">
-          <h2 className="text-lg sm:text-xl font-extrabold text-stone-900 tracking-tight">
-            What's on your mind?
-          </h2>
-
-          <div className="relative">
-            {showLeftCateButton && (
-              <button
-                className="absolute -left-3 top-1/2 -translate-y-1/2 bg-white text-stone-800 p-2.5 rounded-full shadow-lg border border-stone-200 hover:bg-[#ff5200] hover:text-white z-10 transition"
-                onClick={() => scrollHandler(cateScrollRef, "left")}
-                aria-label="Scroll cuisines left"
-              >
-                <FaCircleChevronLeft size={16} />
-              </button>
-            )}
-
-            <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-none snap-x" ref={cateScrollRef}>
-              <button
-                onClick={() => setActiveCategory("All")}
-                className={`flex-none px-5 py-2.5 rounded-2xl font-bold text-xs transition border shadow-sm ${activeCategory === "All"
-                    ? "bg-[#ff5200] text-white border-[#ff5200]"
-                    : "bg-white text-stone-700 border-stone-200 hover:border-[#ff5200]"
-                  }`}
-              >
-                All Cuisines
-              </button>
-
-              {categories.map((cate, index) => (
-                <CategoryCard
-                  name={cate.category}
-                  image={cate.image}
-                  key={index}
-                  onClick={() => setActiveCategory(cate.category)}
-                />
-              ))}
-            </div>
-
-            {showRightCateButton && (
-              <button
-                className="absolute -right-3 top-1/2 -translate-y-1/2 bg-white text-stone-800 p-2.5 rounded-full shadow-lg border border-stone-200 hover:bg-[#ff5200] hover:text-white z-10 transition"
-                onClick={() => scrollHandler(cateScrollRef, "right")}
-                aria-label="Scroll cuisines right"
-              >
-                <FaCircleChevronRight size={16} />
-              </button>
-            )}
-          </div>
-        </section>
 
         {/* Module 1.1: Time-of-Day Dynamic Carousel (e.g. Breakfast, Lunch, Snacks, Dinner, Late Night) */}
         {timeSlot && timeSlot.items?.length > 0 && (
