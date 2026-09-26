@@ -449,31 +449,6 @@ function Nav() {
                                                     </span>
                                                 )}
                                             </div>
-
-                                            {/* Operations & Analytics */}
-                                            <div className='border-t border-stone-100 pt-1.5 mt-1'>
-                                                <div className='px-1 pb-1 text-[10px] font-black uppercase tracking-wider text-stone-400'>
-                                                    Operations & Analytics
-                                                </div>
-                                                <div
-                                                    className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-1.5 cursor-pointer flex items-center gap-2.5 transition group'
-                                                    onClick={() => { setShowInfo(false); navigate("/owner/analytics"); }}
-                                                >
-                                                    <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
-                                                        <FaChartLine size={12} />
-                                                    </div>
-                                                    <span>Kitchen Analytics</span>
-                                                </div>
-                                                <div
-                                                    className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-1.5 cursor-pointer flex items-center gap-2.5 transition group'
-                                                    onClick={() => { setShowInfo(false); navigate("/my-orders"); }}
-                                                >
-                                                    <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
-                                                        <TbReceipt2 size={13} />
-                                                    </div>
-                                                    <span>All Platform Orders</span>
-                                                </div>
-                                            </div>
                                         </>
                                     )}
 
@@ -544,7 +519,7 @@ function Nav() {
                                 </div>
 
                                 {/* Section: Personalization & Preferences */}
-                                {userData.role !== "deliveryBoy" && (
+                                {userData.role !== "deliveryBoy" && userData.role !== "admin" && (
                                     <div className='border-t border-stone-100 pt-1.5 space-y-0.5'>
                                         <div
                                             className='text-xs font-bold text-stone-700 hover:text-red-500 hover:bg-red-50/50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
