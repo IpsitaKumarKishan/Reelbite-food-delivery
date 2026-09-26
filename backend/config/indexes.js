@@ -1,6 +1,7 @@
 import Order from "../models/order.model.js";
 import Shop from "../models/shop.model.js";
 import Reel from "../models/reel.model.js";
+import Item from "../models/item.model.js";
 
 export const ensureIndexes = async () => {
   try {
@@ -11,6 +12,8 @@ export const ensureIndexes = async () => {
     await Shop.collection.createIndex({ city: 1 });
     await Reel.collection.createIndex({ likes: 1 });
     await Reel.collection.createIndex({ shop: 1, createdAt: -1 });
+    await Item.collection.createIndex({ shop: 1, foodType: 1, category: 1 });
+    await Item.collection.createIndex({ "rating.average": -1 });
     console.log("Database indexes ensured");
   } catch (error) {
     console.log("Database indexing notice:", error.message || error);

@@ -3,6 +3,7 @@ import { IoIosArrowRoundBack } from "react-icons/io";
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import CartItemCard from '../components/CartItemCard';
+import CartCrossSell from '../components/CartCrossSell';
 function CartPage() {
     const navigate = useNavigate()
     const { cartItems, totalAmount } = useSelector(state => state.user)
@@ -23,6 +24,7 @@ function CartPage() {
                             <CartItemCard data={item} key={index} />
                         ))}
                     </div>
+                    <CartCrossSell />
                     <div className='mt-6 bg-white p-4 rounded-xl shadow flex justify-between items-center border'>
 
                         <h1 className='text-lg font-semibold'>Total Amount</h1>

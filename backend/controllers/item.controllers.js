@@ -129,34 +129,108 @@ export const getItemsByShop=async (req,res) => {
     }
 }
 
-export const searchItems=async (req,res) => {
+export const searchItems = async (req, res) => {
     try {
-        const {query,city}=req.query
-        if(!query || !city){
-            return res.status(400).json({ message: "query and city are required" })
-        }
-        const shops=await Shop.find({
-            city:{$regex:new RegExp(`^${city}$`, "i")}
-        }).populate('items')
-        if(!shops){
-            return res.status(400).json({message:"shops not found"})
-        }
-        const shopIds=shops.map(s=>s._id)
-        const items=await Item.find({
-            shop:{$in:shopIds},
-            $or:[
-              {name:{$regex:query,$options:"i"}},
-              {category:{$regex:query,$options:"i"}}  
-            ]
+        const {
+            query = "",
+            city = "",
+            foodType,
+            category,
+            minPrice,
+            maxPrice,
+            minRating,
+            sortBy
+        } = req.query;
 
-        }).populate("shop","name image").lean()
+        // 1. Resolve shops in the target city (or matching query by shop name)
+        let shopFilter = {};
+        if (city) {
+            shopFilter.city = { $regex: new RegExp(`^${city}$`, "i") };
+        }
 
-        return res.status(200).json(items)
+        const shops = await Shop.find(shopFilter).select("_id name city").lean();
+        const cityShopIds = shops.map(s => s._id);
+
+        // Find any shops whose names match the query (e.g. searching "Dominos")
+        let matchingShopIdsByName = [];
+        if (query && query.trim() !== "") {
+            const matchedShops = await Shop.find({
+                ...shopFilter,
+                name: { $regex: query.trim(), $options: "i" }
+            }).select("_id").lean();
+            matchingShopIdsByName = matchedShops.map(s => s._id);
+        }
+
+        // 2. Build Item Query
+        const itemFilter = {};
+
+        // Restrict to city shops if city provided
+        if (cityShopIds.length > 0) {
+            itemFilter.shop = { $in: cityShopIds };
+        }
+
+        // Query text matching (dish name, category, or belonging to a matched shop)
+        if (query && query.trim() !== "") {
+            const regex = new RegExp(query.trim(), "i");
+            const orConditions = [
+                { name: regex },
+                { category: regex }
+            ];
+
+            if (matchingShopIdsByName.length > 0) {
+                orConditions.push({ shop: { $in: matchingShopIdsByName } });
+            }
+
+            itemFilter.$or = orConditions;
+        }
+
+        // Food type filter (veg / non veg)
+        if (foodType && ["veg", "non veg"].includes(foodType.toLowerCase())) {
+            itemFilter.foodType = foodType.toLowerCase();
+        }
+
+        // Category filter
+        if (category && category !== "All") {
+            itemFilter.category = category;
+        }
+
+        // Price bracket filtering
+        if (minPrice !== undefined || maxPrice !== undefined) {
+            itemFilter.price = {};
+            if (minPrice !== undefined && minPrice !== "") {
+                itemFilter.price.$gte = Number(minPrice);
+            }
+            if (maxPrice !== undefined && maxPrice !== "") {
+                itemFilter.price.$lte = Number(maxPrice);
+            }
+        }
+
+        // Minimum Rating filtering
+        if (minRating !== undefined && minRating !== "") {
+            itemFilter["rating.average"] = { $gte: Number(minRating) };
+        }
+
+        // 3. Sorting configuration
+        let sortOption = { "rating.average": -1, createdAt: -1 };
+        if (sortBy === "price_asc") {
+            sortOption = { price: 1 };
+        } else if (sortBy === "price_desc") {
+            sortOption = { price: -1 };
+        } else if (sortBy === "rating_desc") {
+            sortOption = { "rating.average": -1 };
+        }
+
+        const items = await Item.find(itemFilter)
+            .sort(sortOption)
+            .populate("shop", "name image city")
+            .lean();
+
+        return res.status(200).json(items);
 
     } catch (error) {
-         return res.status(500).json({ message: `search item  error ${error}` })
+        return res.status(500).json({ message: `search item error: ${error.message}` });
     }
-}
+};
 
 
 export const rating=async (req,res) => {
