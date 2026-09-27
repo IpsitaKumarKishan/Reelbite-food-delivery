@@ -19,33 +19,37 @@ export const getOwnerEarnings = async (req, res) => {
     const ownerOrderDetails = [];
 
     orders.forEach((order) => {
+      const isOrderCancelled = Boolean(order.cancellation?.isCancelled);
       order.shopOrders.forEach((so) => {
         if (so.owner && so.owner.toString() === ownerId.toString()) {
+          const isCancelled = isOrderCancelled || so.status === "cancelled";
           const subtotal = Number(so.subtotal) || 0;
           const rate = Number(so.commissionRate) || 20;
           const commissionAmount = Number(so.commissionAmount) || Math.round(subtotal * (rate / 100) * 100) / 100;
           const restaurantPayout = Number(so.restaurantPayout) || Math.round((subtotal - commissionAmount) * 100) / 100;
           const settlementStatus = so.settlementStatus || "unsettled";
 
-          totalCommissionDeducted += commissionAmount;
-          if (settlementStatus === "settled") {
-            totalSettledPayout += restaurantPayout;
-          } else {
-            totalUnsettledPayout += restaurantPayout;
+          if (!isCancelled) {
+            totalCommissionDeducted += commissionAmount;
+            if (settlementStatus === "settled") {
+              totalSettledPayout += restaurantPayout;
+            } else {
+              totalUnsettledPayout += restaurantPayout;
+            }
           }
 
           ownerOrderDetails.push({
             orderId: order._id,
             createdAt: order.createdAt,
             paymentMethod: order.paymentMethod,
-            paymentStatus: order.payment ? "Paid" : "Pending",
+            paymentStatus: isCancelled ? "Cancelled" : (order.payment ? "Paid" : "Pending"),
             orderStatus: so.status,
             items: so.shopOrderItems,
             subtotal,
             commissionRate: rate,
-            commissionAmount,
-            restaurantPayout,
-            settlementStatus
+            commissionAmount: isCancelled ? 0 : commissionAmount,
+            restaurantPayout: isCancelled ? 0 : restaurantPayout,
+            settlementStatus: isCancelled ? "cancelled" : settlementStatus
           });
         }
       });

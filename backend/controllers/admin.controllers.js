@@ -34,23 +34,47 @@ export const getPlatformMetrics = async (req, res) => {
     }
 
     allOrders.forEach((order) => {
-      const amount = Number(order.totalAmount) || 0;
-      const subtotal = Number(order.subtotal) || amount;
-      const orderCommission = Number(order.commissionAmount) || subtotal * 0.15;
-      const pRevenue = Number(order.platformRevenue) || orderCommission + (order.platformFee || 5);
+      const isFullyCancelled = Boolean(
+        order.cancellation?.isCancelled ||
+        (order.shopOrders && order.shopOrders.length > 0 && order.shopOrders.every((so) => so.status === "cancelled"))
+      );
+
+      if (isFullyCancelled) {
+        cancelledOrdersCount += 1;
+        return; // Revert revenue: fully cancelled orders do not count towards GMV, Platform Revenue, or Fees
+      }
+
+      // Check if partially cancelled (e.g. 1 shop rejected, 1 fulfilled)
+      const activeShopOrders = (order.shopOrders || []).filter((so) => so.status !== "cancelled");
+      const isPartiallyCancelled = activeShopOrders.length < (order.shopOrders || []).length;
+
+      let effectiveAmount = Number(order.totalAmount) || 0;
+      let effectiveSubtotal = Number(order.subtotal) || effectiveAmount;
+      let orderCommission = Number(order.commissionAmount) || effectiveSubtotal * 0.15;
+      let pRevenue = Number(order.platformRevenue) || orderCommission + (Number(order.platformFee) || 5);
+
+      if (isPartiallyCancelled && activeShopOrders.length > 0) {
+        effectiveSubtotal = activeShopOrders.reduce((sum, so) => sum + (Number(so.subtotal) || 0), 0);
+        orderCommission = activeShopOrders.reduce(
+          (sum, so) => sum + (Number(so.commissionAmount) || (Number(so.subtotal) || 0) * 0.15),
+          0
+        );
+        pRevenue = orderCommission + (Number(order.platformFee) || 5);
+        effectiveAmount =
+          effectiveSubtotal +
+          (Number(order.deliveryFee) || 0) +
+          (Number(order.platformFee) || 0) -
+          (Number(order.coupon?.discountAmount) || 0);
+      }
+
       const orderDate = new Date(order.createdAt);
       const dateKey = orderDate.toISOString().split("T")[0];
 
-      gmv += amount;
+      gmv += effectiveAmount;
       platformRevenue += pRevenue;
       totalDeliveryFees += Number(order.deliveryFee) || 0;
       totalPlatformFees += Number(order.platformFee) || 0;
-
-      if (order.cancellation?.isCancelled) {
-        cancelledOrdersCount += 1;
-      } else {
-        deliveredOrdersCount += 1;
-      }
+      deliveredOrdersCount += 1;
 
       // City radar
       const addressCity = order.deliveryAddress?.text?.split(",")?.slice(-2)?.[0]?.trim() || "Local";
@@ -58,11 +82,11 @@ export const getPlatformMetrics = async (req, res) => {
         cityMap[addressCity] = { city: addressCity, orders: 0, revenue: 0 };
       }
       cityMap[addressCity].orders += 1;
-      cityMap[addressCity].revenue += amount;
+      cityMap[addressCity].revenue += effectiveAmount;
 
       // 7-day trend
       if (dayMap[dateKey]) {
-        dayMap[dateKey].gmv += amount;
+        dayMap[dateKey].gmv += effectiveAmount;
         dayMap[dateKey].orders += 1;
       }
     });
@@ -87,6 +111,8 @@ export const getPlatformMetrics = async (req, res) => {
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 6);
 
+    const activeOrdersCount = allOrders.length - cancelledOrdersCount;
+
     return res.status(200).json({
       overview: {
         gmv: Math.round(gmv),
@@ -96,7 +122,7 @@ export const getPlatformMetrics = async (req, res) => {
         cancelledOrdersCount,
         totalDeliveryFees,
         totalPlatformFees,
-        averageOrderValue: allOrders.length > 0 ? Math.round(gmv / allOrders.length) : 0,
+        averageOrderValue: activeOrdersCount > 0 ? Math.round(gmv / activeOrdersCount) : 0,
       },
       userBreakdown,
       shopBreakdown,
@@ -142,6 +168,7 @@ export const getAllShops = async (req, res) => {
         let completedOrders = 0;
 
         shopOrders.forEach((o) => {
+          if (o.cancellation?.isCancelled) return;
           const so = o.shopOrders.find((s) => s.shop && s.shop.toString() === shop._id.toString());
           if (so && so.status === "delivered") {
             totalRevenue += Number(so.subtotal) || 0;
