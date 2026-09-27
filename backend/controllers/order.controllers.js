@@ -16,12 +16,31 @@ let instance = new RazorPay({
 
 export const placeOrder = async (req, res) => {
     try {
-        const { cartItems, paymentMethod, deliveryAddress, totalAmount, couponCode } = req.body
+        const { cartItems, paymentMethod, deliveryAddress, totalAmount, couponCode, contactMobile } = req.body
         if (cartItems.length == 0 || !cartItems) {
             return res.status(400).json({ message: "cart is empty" })
         }
         if (!deliveryAddress.text || !deliveryAddress.latitude || !deliveryAddress.longitude) {
             return res.status(400).json({ message: "send complete deliveryAddress" })
+        }
+
+        const user = await User.findById(req.userId)
+        if (!user) {
+            return res.status(404).json({ message: "User not found" })
+        }
+
+        const rawMobile = contactMobile || req.body.mobile || user.mobile || ""
+        const cleanMobile = String(rawMobile).replace(/\D/g, "")
+        if (!cleanMobile || cleanMobile.length < 10 || cleanMobile === "0000000000") {
+            return res.status(400).json({
+                message: "A valid 10-digit contact mobile number is mandatory so our delivery partner can contact you."
+            })
+        }
+
+        // If user profile has placeholder or no number, save the valid contact number
+        if (!user.mobile || user.mobile === "0000000000" || user.mobile.length < 10) {
+            user.mobile = cleanMobile
+            await user.save()
         }
 
         const groupItemsByShop = {}
@@ -104,6 +123,7 @@ export const placeOrder = async (req, res) => {
                 user: req.userId,
                 paymentMethod,
                 deliveryAddress,
+                contactMobile: cleanMobile,
                 totalAmount: payableTotal,
                 subtotal: calculatedSplit.subtotal,
                 deliveryFee: calculatedSplit.deliveryFee,
@@ -135,6 +155,7 @@ export const placeOrder = async (req, res) => {
             user: req.userId,
             paymentMethod,
             deliveryAddress,
+            contactMobile: cleanMobile,
             totalAmount: payableTotal,
             subtotal: calculatedSplit.subtotal,
             deliveryFee: calculatedSplit.deliveryFee,
@@ -568,6 +589,7 @@ export const getCurrentOrder = async (req, res) => {
         return res.status(200).json({
             _id: assignment.order._id,
             user: assignment.order.user,
+            contactMobile: assignment.order.contactMobile || assignment.order.user?.mobile || "",
             shopOrder,
             deliveryAddress: assignment.order.deliveryAddress,
             deliveryBoyLocation,

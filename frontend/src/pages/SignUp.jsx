@@ -20,6 +20,8 @@ function SignUp() {
   const [mobile, setMobile] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googlePending, setGooglePending] = useState(null);
+  const [pendingMobile, setPendingMobile] = useState('');
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -33,8 +35,9 @@ function SignUp() {
       setErr('Please enter a valid email address.');
       return false;
     }
-    if (!mobile || mobile.length < 10) {
-      setErr('Mobile number must be at least 10 digits.');
+    const cleanMobile = mobile.replace(/\D/g, '');
+    if (!cleanMobile || cleanMobile.length !== 10 || cleanMobile === '0000000000') {
+      setErr('A valid 10-digit mobile number is mandatory.');
       return false;
     }
     if (!password || password.length < 6) {
@@ -51,9 +54,10 @@ function SignUp() {
     setLoading(true);
     setErr('');
     try {
+      const cleanMobile = mobile.replace(/\D/g, '');
       const result = await axios.post(
         `${serverUrl}/api/auth/signup`,
-        { fullName, email, password, mobile, role },
+        { fullName, email, password, mobile: cleanMobile, role },
         { withCredentials: true }
       );
       dispatch(setUserData(result.data));
@@ -75,13 +79,51 @@ function SignUp() {
         prompt: 'select_account'
       });
       const result = await signInWithPopup(auth, provider);
+      const cleanMobile = mobile ? mobile.replace(/\D/g, '') : (result.user.phoneNumber || '');
       const { data } = await axios.post(
         `${serverUrl}/api/auth/google-auth`,
         {
           fullName: result.user.displayName || fullName || result.user.email?.split('@')[0] || 'User',
           email: result.user.email,
           role: role || 'user',
-          mobile: mobile || result.user.phoneNumber || '0000000000',
+          mobile: cleanMobile,
+        },
+        { withCredentials: true }
+      );
+
+      if (data?.needsMobile) {
+        setGooglePending(data);
+        setLoading(false);
+        return;
+      }
+
+      dispatch(setUserData(data));
+      setLoading(false);
+      navigate('/');
+    } catch (error) {
+      console.error("Google Auth Error:", error);
+      setErr(error?.response?.data?.message || (error?.code ? `${error.code}: ${error.message}` : error?.message) || 'Google Sign-Up failed');
+      setLoading(false);
+    }
+  };
+
+  const handleCompleteGoogleAuth = async (e) => {
+    e?.preventDefault();
+    const clean = pendingMobile.replace(/\D/g, '');
+    if (!clean || clean.length !== 10 || clean === '0000000000') {
+      setErr('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    setLoading(true);
+    setErr('');
+    try {
+      const { data } = await axios.post(
+        `${serverUrl}/api/auth/google-auth`,
+        {
+          fullName: googlePending.fullName,
+          email: googlePending.email,
+          mobile: clean,
+          role: googlePending.role || 'user',
         },
         { withCredentials: true }
       );
@@ -89,8 +131,7 @@ function SignUp() {
       setLoading(false);
       navigate('/');
     } catch (error) {
-      console.error("Google Auth Error:", error);
-      setErr(error?.response?.data?.message || (error?.code ? `${error.code}: ${error.message}` : error?.message) || 'Google Sign-Up failed');
+      setErr(error?.response?.data?.message || 'Failed to complete registration');
       setLoading(false);
     }
   };
@@ -153,8 +194,63 @@ function SignUp() {
           )}
         </AnimatePresence>
 
-        {/* Form */}
-        <form onSubmit={handleSignUp} className="space-y-3.5">
+        {googlePending ? (
+          /* Google Sign-Up Phone Collection Step */
+          <form onSubmit={handleCompleteGoogleAuth} className="space-y-4">
+            <div className="rounded-2xl bg-orange-50 border border-orange-200 p-4 text-center space-y-1">
+              <div className="w-10 h-10 rounded-full bg-[#ff5200] text-white flex items-center justify-center mx-auto mb-2">
+                <Phone size={18} />
+              </div>
+              <h3 className="text-sm font-extrabold text-stone-900">Mobile Number Required</h3>
+              <p className="text-xs text-stone-600">
+                Hi <strong className="text-stone-900">{googlePending.fullName}</strong>! A valid 10-digit phone number is required so delivery partners can contact you when delivering your food.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-stone-700 mb-1">10-Digit Mobile Number</label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-2.5 text-xs font-bold text-stone-400">+91</span>
+                <input
+                  type="tel"
+                  maxLength={10}
+                  value={pendingMobile}
+                  onChange={(e) => setPendingMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  placeholder="9876543210"
+                  className="w-full rounded-xl border border-stone-300 bg-stone-50/50 py-2.5 pl-12 pr-4 text-xs sm:text-sm font-bold text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
+                  autoFocus
+                  required
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || pendingMobile.length !== 10}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#ff4d2d] to-amber-500 py-3 font-display text-sm font-bold text-white shadow-lg shadow-[#ff4d2d]/30 transition hover:opacity-95 active:scale-[0.98] disabled:opacity-60 cursor-pointer"
+            >
+              {loading ? (
+                <ClipLoader size={18} color="#ffffff" />
+              ) : (
+                <>
+                  <span>Complete Registration</span>
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setGooglePending(null); setErr(''); }}
+              className="w-full text-center text-xs font-semibold text-stone-500 hover:text-stone-800 transition py-1"
+            >
+              Cancel & try another account
+            </button>
+          </form>
+        ) : (
+          <>
+            {/* Form */}
+            <form onSubmit={handleSignUp} className="space-y-3.5">
           <div>
             <label className="block text-xs font-bold text-stone-700 mb-1">Full Name</label>
             <div className="relative">
@@ -285,6 +381,8 @@ function SignUp() {
           <FcGoogle className="h-5 w-5" />
           <span>Sign up with Google</span>
         </button>
+        </>
+        )}
 
         {/* Footer Link */}
         <p className="mt-6 text-center text-xs text-stone-500">

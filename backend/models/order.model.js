@@ -70,6 +70,10 @@ const orderSchema = new mongoose.Schema({
         latitude: Number,
         longitude: Number
     },
+    contactMobile: {
+        type: String,
+        default: ""
+    },
     totalAmount: {
         type: Number
     },

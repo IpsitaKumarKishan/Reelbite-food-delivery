@@ -8,13 +8,14 @@ import { useDispatch, useSelector } from 'react-redux';
 import "leaflet/dist/leaflet.css"
 import { setAddress, setLocation } from '../redux/mapSlice';
 import { MdDeliveryDining } from "react-icons/md";
-import { FaCreditCard } from "react-icons/fa";
+import { FaCreditCard, FaPhoneAlt } from "react-icons/fa";
 import axios from 'axios';
 import { FaMobileScreenButton } from "react-icons/fa6";
 import { useNavigate } from 'react-router-dom';
 import { serverUrl } from '../App';
 import { addMyOrder, clearCart, setTotalAmount } from '../redux/userSlice';
 import CouponSection from '../components/CouponSection';
+import { toast } from 'react-hot-toast';
 
 function RecenterMap({ location }) {
   const map = useMap()
@@ -32,8 +33,21 @@ function CheckOut() {
   const [addressInput, setAddressInput] = useState("")
   const [paymentMethod, setPaymentMethod] = useState("cod")
   const [appliedCoupon, setAppliedCoupon] = useState(null)
+  const [contactPhone, setContactPhone] = useState(
+    userData?.mobile && userData?.mobile !== "0000000000" && userData?.mobile.length >= 10
+      ? userData.mobile
+      : ""
+  )
+  const [phoneError, setPhoneError] = useState("")
   const navigate = useNavigate()
   const dispatch = useDispatch()
+
+  useEffect(() => {
+    if (userData?.mobile && userData?.mobile !== "0000000000" && userData?.mobile.length >= 10 && !contactPhone) {
+      setContactPhone(userData.mobile)
+    }
+  }, [userData])
+
   const apiKey = import.meta.env.VITE_GEOAPIKEY
   const discountAmount = appliedCoupon ? appliedCoupon.discountAmount : 0
   const subtotalAfterDiscount = Math.max(0, totalAmount - discountAmount)
@@ -79,32 +93,41 @@ function CheckOut() {
     }
   }
 
-  const handlePlaceOrder=async () => {
+  const handlePlaceOrder = async () => {
+    const cleanPhone = contactPhone.replace(/\D/g, "");
+    if (!cleanPhone || cleanPhone.length !== 10 || cleanPhone === "0000000000") {
+      setPhoneError("Please enter a valid 10-digit mobile number so our delivery partner can contact you.");
+      toast.error("Valid 10-digit contact mobile number is required");
+      return;
+    }
+    setPhoneError("");
+
     try {
-      const result=await axios.post(`${serverUrl}/api/order/place-order`,{
+      const result = await axios.post(`${serverUrl}/api/order/place-order`, {
         paymentMethod,
-        deliveryAddress:{
-          text:addressInput,
-          latitude:location.lat,
-          longitude:location.lon
+        deliveryAddress: {
+          text: addressInput,
+          latitude: location.lat,
+          longitude: location.lon
         },
-        totalAmount:AmountWithDeliveryFee,
+        contactMobile: cleanPhone,
+        totalAmount: AmountWithDeliveryFee,
         cartItems,
         couponCode: appliedCoupon?.code || null
-      },{withCredentials:true})
+      }, { withCredentials: true })
 
-      if(paymentMethod=="cod"){
-      dispatch(addMyOrder(result.data))
-      dispatch(clearCart())
-      navigate("/order-placed")
-      }else{
-        const orderId=result.data.orderId
-        const razorOrder=result.data.razorOrder
-          openRazorpayWindow(orderId,razorOrder)
-       }
-    
+      if (paymentMethod === "cod") {
+        dispatch(addMyOrder(result.data))
+        dispatch(clearCart())
+        navigate("/order-placed")
+      } else {
+        const orderId = result.data.orderId
+        const razorOrder = result.data.razorOrder
+        openRazorpayWindow(orderId, razorOrder)
+      }
     } catch (error) {
-      console.log(error)
+      console.error(error)
+      toast.error(error.response?.data?.message || "Failed to place order. Please try again.")
     }
   }
 
@@ -180,6 +203,45 @@ const openRazorpayWindow=(orderId,razorOrder)=>{
 
               </MapContainer>
             </div>
+          </div>
+        </section>
+
+        {/* Contact Phone Number for Delivery Partner */}
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className='text-lg font-semibold text-gray-800 flex items-center gap-2'>
+              <FaPhoneAlt className="text-[#ff4d2d] text-base" />
+              <span>Contact Phone Number</span>
+            </h2>
+            <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+              Required for Delivery
+            </span>
+          </div>
+
+          <div className='rounded-xl border bg-white p-4 shadow-sm space-y-2'>
+            <p className='text-xs text-gray-500'>
+              The delivery partner will call this mobile number to coordinate delivery upon arrival.
+            </p>
+            <div className='flex items-center gap-2 border border-gray-300 rounded-xl px-3.5 py-2.5 bg-gray-50 focus-within:bg-white focus-within:border-[#ff4d2d] focus-within:ring-2 focus-within:ring-[#ff4d2d]/20 transition'>
+              <span className='text-xs font-bold text-gray-500'>+91</span>
+              <input
+                type='tel'
+                maxLength={10}
+                placeholder='Enter 10-digit mobile number'
+                value={contactPhone}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setContactPhone(val);
+                  if (val.length === 10) setPhoneError("");
+                }}
+                className='w-full bg-transparent text-sm font-semibold text-gray-800 outline-none'
+              />
+            </div>
+            {phoneError && (
+              <p className='text-xs font-semibold text-red-500 flex items-center gap-1 mt-1'>
+                <span>⚠️</span> {phoneError}
+              </p>
+            )}
           </div>
         </section>
 

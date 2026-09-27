@@ -8,6 +8,7 @@ import DeliveryBoyTracking from './DeliveryBoyTracking'
 import { ClipLoader } from 'react-spinners'
 import { useSocket } from '../context/SocketContext'
 import { toast } from 'react-hot-toast'
+import { Phone, User as UserIcon } from 'lucide-react'
 
 function DeliveryBoy() {
   const { userData } = useSelector(state => state.user)
@@ -236,10 +237,39 @@ function DeliveryBoy() {
         {currentOrder && (
           <div className='bg-white rounded-2xl p-5 shadow-md w-[90%] border border-orange-100 space-y-4'>
             <h2 className='text-lg font-bold text-stone-900'>📦 Active Order Assignment</h2>
-            <div className='border border-stone-200 rounded-xl p-4 bg-stone-50/50 space-y-1'>
-              <p className='font-bold text-sm text-stone-800'>{currentOrder?.shopOrder.shop.name}</p>
+            <div className='border border-stone-200 rounded-xl p-4 bg-stone-50/50 space-y-2.5'>
+              <div className="flex items-center justify-between">
+                <p className='font-bold text-sm text-stone-800'>{currentOrder?.shopOrder?.shop?.name}</p>
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-100/70 px-2.5 py-0.5 rounded-full">
+                  ₹{currentOrder?.shopOrder?.subtotal}
+                </span>
+              </div>
+
+              {/* Customer Contact Box */}
+              {(currentOrder?.contactMobile || currentOrder?.user?.mobile) && (
+                <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-stone-200 shadow-sm">
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                      <UserIcon size={13} className="text-[#ff5200]" />
+                      <span>{currentOrder?.user?.fullName || "Customer"}</span>
+                    </p>
+                    <p className="text-xs font-semibold text-stone-600 flex items-center gap-1">
+                      <Phone size={12} className="text-emerald-600" />
+                      <span>{currentOrder?.contactMobile || currentOrder?.user?.mobile}</span>
+                    </p>
+                  </div>
+                  <a
+                    href={`tel:${currentOrder?.contactMobile || currentOrder?.user?.mobile}`}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow transition"
+                  >
+                    <Phone size={13} />
+                    <span>Call Customer</span>
+                  </a>
+                </div>
+              )}
+
               <p className='text-xs text-stone-600'><span className="font-bold">Customer Address:</span> {currentOrder.deliveryAddress.text}</p>
-              <p className='text-xs text-stone-400 pt-1'>{currentOrder.shopOrder.shopOrderItems.length} items | Subtotal: ₹{currentOrder.shopOrder.subtotal}</p>
+              <p className='text-xs text-stone-400'>{currentOrder.shopOrder.shopOrderItems.length} items</p>
             </div>
 
             <DeliveryBoyTracking data={{

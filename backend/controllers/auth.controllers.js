@@ -21,6 +21,10 @@ const sanitizeUser = (user) => {
 export const signUp=async (req,res) => {
     try {
         const {fullName,email,password,mobile,role}=req.body
+        const cleanMobile = mobile ? String(mobile).replace(/\D/g, '') : ""
+        if (!cleanMobile || cleanMobile.length < 10 || cleanMobile === "0000000000") {
+            return res.status(400).json({ message: "A valid 10-digit mobile number is required." })
+        }
         let user=await User.findOne({email})
         if(user){
             return res.status(400).json({message:"User Already exist."})
@@ -28,16 +32,13 @@ export const signUp=async (req,res) => {
         if(password.length<6){
             return res.status(400).json({message:"password must be at least 6 characters."})
         }
-        if(mobile.length<10){
-            return res.status(400).json({message:"mobile no must be at least 10 digits."})
-        }
      
         const hashedPassword=await bcrypt.hash(password,10)
         user=await User.create({
             fullName,
             email,
             role,
-            mobile,
+            mobile: cleanMobile,
             password:hashedPassword
         })
 
@@ -54,7 +55,17 @@ export const signUp=async (req,res) => {
 export const signIn=async (req,res) => {
     try {
         const {email,password}=req.body
-        const user=await User.findOne({email})
+        if (!email) {
+            return res.status(400).json({ message: "Email or mobile number is required." })
+        }
+
+        const identifier = String(email).trim()
+        const isNumericPhone = /^\d{10}$/.test(identifier.replace(/[\s+-]/g, ''))
+        const query = isNumericPhone
+            ? { mobile: identifier.replace(/\D/g, '') }
+            : { email: identifier.toLowerCase() }
+
+        const user=await User.findOne(query)
         if(!user){
             return res.status(400).json({message:"User does not exist."})
         }
@@ -147,17 +158,46 @@ export const resetPassword=async (req,res) => {
 export const googleAuth = async (req, res) => {
     try {
         const { fullName, email, mobile, role } = req.body
-        let user = await User.findOne({ email })
+        if (!email) {
+            return res.status(400).json({ message: "Email is required for Google Sign-In" })
+        }
+
+        let user = await User.findOne({ email: email.toLowerCase() })
         if (user && user.status === "suspended") {
             return res.status(403).json({ message: "Your account has been suspended by the platform administrator." });
         }
+
+        const cleanMobile = mobile ? String(mobile).replace(/\D/g, '') : ''
+        const hasValidMobileInput = cleanMobile.length >= 10 && cleanMobile !== "0000000000"
+
+        // If user already exists and already has a valid phone number, log them in immediately
+        if (user && user.mobile && user.mobile.length >= 10 && user.mobile !== "0000000000") {
+            const token = await genToken(user._id)
+            res.cookie("token", token, COOKIE_OPTIONS)
+            return res.status(200).json(sanitizeUser(user))
+        }
+
+        // If new user or existing user missing phone number, and no valid phone number was supplied:
+        if (!hasValidMobileInput) {
+            return res.status(200).json({
+                needsMobile: true,
+                email: email.toLowerCase(),
+                fullName: user?.fullName || fullName || (email ? email.split("@")[0] : "User"),
+                role: user?.role || role || "user",
+                message: "Please provide a valid 10-digit phone number to complete login."
+            })
+        }
+
         if (!user) {
             user = await User.create({
                 fullName: fullName || (email ? email.split("@")[0] : "User"),
-                email,
-                mobile: mobile || "0000000000",
+                email: email.toLowerCase(),
+                mobile: cleanMobile,
                 role: role || "user"
             })
+        } else {
+            user.mobile = cleanMobile
+            await user.save()
         }
 
         const token = await genToken(user._id)

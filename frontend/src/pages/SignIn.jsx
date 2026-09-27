@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Lock, Mail, UtensilsCrossed, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, UtensilsCrossed, AlertCircle, ArrowRight, ArrowLeft, Phone } from 'lucide-react';
 import { FcGoogle } from 'react-icons/fc';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -17,13 +17,18 @@ function SignIn() {
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googlePending, setGooglePending] = useState(null);
+  const [pendingMobile, setPendingMobile] = useState('');
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
   const validateForm = () => {
-    if (!email || !email.includes('@')) {
-      setErr('Please enter a valid email address.');
+    const trimmed = email.trim();
+    const isEmail = trimmed.includes('@');
+    const isPhone = /^\d{10}$/.test(trimmed.replace(/[\s+-]/g, ''));
+    if (!isEmail && !isPhone) {
+      setErr('Please enter a valid email address or 10-digit mobile number.');
       return false;
     }
     if (!password || password.length < 6) {
@@ -42,7 +47,7 @@ function SignIn() {
     try {
       const result = await axios.post(
         `${serverUrl}/api/auth/signin`,
-        { email, password },
+        { email: email.trim(), password },
         { withCredentials: true }
       );
       dispatch(setUserData(result.data));
@@ -73,8 +78,49 @@ function SignIn() {
         {
           fullName: result.user.displayName || result.user.email?.split('@')[0] || 'User',
           email: result.user.email,
-          mobile: result.user.phoneNumber || '0000000000',
+          mobile: result.user.phoneNumber || '',
           role: 'user',
+        },
+        { withCredentials: true }
+      );
+
+      if (data?.needsMobile) {
+        setGooglePending(data);
+        setLoading(false);
+        return;
+      }
+
+      dispatch(setUserData(data));
+      setLoading(false);
+      if (data?.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
+    } catch (error) {
+      console.error("Google Auth Error:", error);
+      setErr(error?.response?.data?.message || (error?.code ? `${error.code}: ${error.message}` : error?.message) || 'Google Sign-In failed');
+      setLoading(false);
+    }
+  };
+
+  const handleCompleteGoogleAuth = async (e) => {
+    e?.preventDefault();
+    const clean = pendingMobile.replace(/\D/g, '');
+    if (!clean || clean.length !== 10 || clean === "0000000000") {
+      setErr('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    setLoading(true);
+    setErr('');
+    try {
+      const { data } = await axios.post(
+        `${serverUrl}/api/auth/google-auth`,
+        {
+          fullName: googlePending.fullName,
+          email: googlePending.email,
+          mobile: clean,
+          role: googlePending.role || 'user',
         },
         { withCredentials: true }
       );
@@ -86,8 +132,7 @@ function SignIn() {
         navigate('/');
       }
     } catch (error) {
-      console.error("Google Auth Error:", error);
-      setErr(error?.response?.data?.message || (error?.code ? `${error.code}: ${error.message}` : error?.message) || 'Google Sign-In failed');
+      setErr(error?.response?.data?.message || 'Failed to complete login');
       setLoading(false);
     }
   };
@@ -150,91 +195,148 @@ function SignIn() {
           )}
         </AnimatePresence>
 
-        {/* Form */}
-        <form onSubmit={handleSignIn} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-stone-700 mb-1">Email Address</label>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-3 h-4 w-4 text-stone-400" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                autoComplete="off"
-                className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-2.5 pl-10 pr-4 text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
-                required
-              />
+        {googlePending ? (
+          /* Google Sign-In Phone Collection Step */
+          <form onSubmit={handleCompleteGoogleAuth} className="space-y-4">
+            <div className="rounded-2xl bg-orange-50 border border-orange-200 p-4 text-center space-y-1">
+              <div className="w-10 h-10 rounded-full bg-[#ff5200] text-white flex items-center justify-center mx-auto mb-2">
+                <Phone size={18} />
+              </div>
+              <h3 className="text-sm font-extrabold text-stone-900">Contact Number Required</h3>
+              <p className="text-xs text-stone-600">
+                Hi <strong className="text-stone-900">{googlePending.fullName}</strong>! Delivery partners need your 10-digit mobile number to contact you when your food arrives.
+              </p>
             </div>
-          </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-bold text-stone-700">Password</label>
+            <div>
+              <label className="block text-xs font-bold text-stone-700 mb-1">10-Digit Mobile Number</label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-2.5 text-xs font-bold text-stone-400">+91</span>
+                <input
+                  type="tel"
+                  maxLength={10}
+                  value={pendingMobile}
+                  onChange={(e) => setPendingMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  placeholder="9876543210"
+                  className="w-full rounded-xl border border-stone-300 bg-stone-50/50 py-2.5 pl-12 pr-4 text-xs sm:text-sm font-bold text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
+                  autoFocus
+                  required
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || pendingMobile.length !== 10}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#ff4d2d] to-amber-500 py-3 font-display text-sm font-bold text-white shadow-lg shadow-[#ff4d2d]/30 transition hover:opacity-95 active:scale-[0.98] disabled:opacity-60 cursor-pointer"
+            >
+              {loading ? (
+                <ClipLoader size={18} color="#ffffff" />
+              ) : (
+                <>
+                  <span>Complete Login & Continue</span>
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setGooglePending(null); setErr(''); }}
+              className="w-full text-center text-xs font-semibold text-stone-500 hover:text-stone-800 transition py-1"
+            >
+              Cancel & try another account
+            </button>
+          </form>
+        ) : (
+          <>
+            {/* Form */}
+            <form onSubmit={handleSignIn} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1">Email or 10-Digit Mobile</label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-3 h-4 w-4 text-stone-400" />
+                  <input
+                    type="text"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com or 9876543210"
+                    autoComplete="username"
+                    className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-2.5 pl-10 pr-4 text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-stone-700">Password</label>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/forgot-password')}
+                    className="text-[11px] font-bold text-[#ff5200] hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-3 h-4 w-4 text-stone-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-2.5 pl-10 pr-10 text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-3 text-stone-400 hover:text-stone-600"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit CTA */}
               <button
-                type="button"
-                onClick={() => navigate('/forgot-password')}
-                className="text-[11px] font-bold text-[#ff5200] hover:underline"
+                type="submit"
+                disabled={loading}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#ff4d2d] to-amber-500 py-3 font-display text-sm font-bold text-white shadow-lg shadow-[#ff4d2d]/30 transition hover:opacity-95 active:scale-[0.98] disabled:opacity-60 cursor-pointer"
               >
-                Forgot password?
+                {loading ? (
+                  <ClipLoader size={18} color="#ffffff" />
+                ) : (
+                  <>
+                    <span>Sign In</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
               </button>
+            </form>
+
+            {/* Divider */}
+            <div className="relative my-5 flex items-center justify-center">
+              <div className="w-full border-t border-stone-200" />
+              <span className="absolute bg-white px-3 text-[11px] font-bold uppercase tracking-wider text-stone-400">
+                Or Continue With
+              </span>
             </div>
-            <div className="relative">
-              <Lock className="absolute left-3.5 top-3 h-4 w-4 text-stone-400" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-2.5 pl-10 pr-10 text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-3 text-stone-400 hover:text-stone-600"
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
 
-          {/* Submit CTA */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#ff4d2d] to-amber-500 py-3 font-display text-sm font-bold text-white shadow-lg shadow-[#ff4d2d]/30 transition hover:opacity-95 active:scale-[0.98] disabled:opacity-60 cursor-pointer"
-          >
-            {loading ? (
-              <ClipLoader size={18} color="#ffffff" />
-            ) : (
-              <>
-                <span>Sign In</span>
-                <ArrowRight className="h-4 w-4" />
-              </>
-            )}
-          </button>
-        </form>
-
-        {/* Divider */}
-        <div className="relative my-5 flex items-center justify-center">
-          <div className="w-full border-t border-stone-200" />
-          <span className="absolute bg-white px-3 text-[11px] font-bold uppercase tracking-wider text-stone-400">
-            Or Continue With
-          </span>
-        </div>
-
-        {/* Google Sign In */}
-        <button
-          type="button"
-          onClick={handleGoogleAuth}
-          disabled={loading}
-          className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-stone-300 bg-white py-2.5 text-xs sm:text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:border-stone-400 active:scale-[0.98] cursor-pointer"
-        >
-          <FcGoogle className="h-5 w-5" />
-          <span>Continue with Google</span>
-        </button>
+            {/* Google Sign In */}
+            <button
+              type="button"
+              onClick={handleGoogleAuth}
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-stone-300 bg-white py-2.5 text-xs sm:text-sm font-bold text-stone-700 transition hover:bg-stone-50 hover:border-stone-400 active:scale-[0.98] cursor-pointer"
+            >
+              <FcGoogle className="h-5 w-5" />
+              <span>Continue with Google</span>
+            </button>
+          </>
+        )}
 
         {/* Footer Link */}
         <p className="mt-6 text-center text-xs text-stone-500">

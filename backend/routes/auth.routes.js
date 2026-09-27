@@ -18,7 +18,7 @@ authRouter.post(
 
 authRouter.post(
   "/signin",
-  body("email").trim().isEmail().withMessage("Please enter a valid email address"),
+  body("email").trim().notEmpty().withMessage("Please enter your email or 10-digit mobile number"),
   body("password").notEmpty().withMessage("Password is required"),
   validate,
   signIn
