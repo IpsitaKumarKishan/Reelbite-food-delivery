@@ -82,12 +82,12 @@ function EditItem() {
      setFrontendImage(currentItem?.image || "")
     },[currentItem])
     return (
-        <div className='flex justify-center flex-col items-center p-6 bg-gradient-to-br from-orange-50 relative to-white min-h-screen'>
-            <div className='absolute top-[20px] left-[20px] z-[10] mb-[10px]' onClick={() => navigate("/")}>
+        <div className='flex justify-center flex-col items-center px-3 sm:px-6 py-8 pb-28 md:pb-12 bg-gradient-to-br from-orange-50 relative to-white min-h-screen'>
+            <div className='absolute top-4 left-4 sm:top-6 sm:left-6 z-[10] cursor-pointer' onClick={() => navigate("/")}>
                 <IoIosArrowRoundBack size={35} className='text-[#ff4d2d]' />
             </div>
 
-            <div className='max-w-lg w-full bg-white shadow-xl rounded-2xl p-8 border border-orange-100'>
+            <div className='max-w-lg w-full bg-white shadow-xl rounded-2xl p-5 sm:p-8 border border-orange-100 mt-10 sm:mt-0'>
                 <div className='flex flex-col items-center mb-6'>
                     <div className='bg-orange-100 p-4 rounded-full mb-4'>
                         <FaUtensils className='text-[#ff4d2d] w-16 h-16' />

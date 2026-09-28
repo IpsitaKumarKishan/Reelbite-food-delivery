@@ -309,7 +309,7 @@ function Nav() {
                         </div>
 
                         {showInfo && (
-                            <div className={`absolute top-12 right-0 ${userData.role === "admin" ? "w-80" : "w-64"} bg-white border border-stone-200/90 shadow-2xl rounded-3xl p-3 flex flex-col gap-1.5 z-[9999] animate-in fade-in slide-in-from-top-2`}>
+                            <div className={`absolute top-12 right-0 ${userData.role === "admin" ? "w-[calc(100vw-1.5rem)] sm:w-80 max-w-sm" : "w-[calc(100vw-2rem)] sm:w-64 max-w-xs"} bg-white border border-stone-200/90 shadow-2xl rounded-3xl p-3 flex flex-col gap-1.5 z-[9999] animate-in fade-in slide-in-from-top-2`}>
                                 {/* User Info Header */}
                                 {userData.role === "admin" ? (
                                     <div className='p-3 rounded-2xl bg-gradient-to-br from-stone-900 via-purple-950 to-indigo-950 text-white border border-purple-500/30 shadow-md'>

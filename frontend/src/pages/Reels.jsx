@@ -120,12 +120,11 @@ const CuisineOnboarding = ({ onDone }) => {
   );
 };
 
-const ReelCard = ({ reel, currentUser, onSkip, onImpression }) => {
+const ReelCard = ({ reel, currentUser, onSkip, onImpression, isMuted, setIsMuted }) => {
   const videoRef = useRef(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
   const [isLiked, setIsLiked] = useState(
     reel.likes?.includes(currentUser?._id)
   );
@@ -168,6 +167,14 @@ const ReelCard = ({ reel, currentUser, onSkip, onImpression }) => {
     ).catch(() => {});
   };
 
+  // Synchronize muted and volume properties directly on video element
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = isMuted;
+      videoRef.current.volume = 1;
+    }
+  }, [isMuted]);
+
   useEffect(() => {
     const videoElement = videoRef.current;
     if (!videoElement) return;
@@ -176,11 +183,40 @@ const ReelCard = ({ reel, currentUser, onSkip, onImpression }) => {
     hasLoggedRef.current = false;
     onImpression?.(reel._id);
 
+    // Audio always on by default
+    videoElement.volume = 1;
+    videoElement.muted = isMuted;
+
     const playPromise = videoElement.play();
     if (playPromise !== undefined) {
       playPromise
         .then(() => setIsPlaying(true))
-        .catch(() => setIsPlaying(false));
+        .catch((err) => {
+          // If browser policy temporarily blocks unmuted autoplay without prior interaction:
+          if (!isMuted) {
+            videoElement.muted = true;
+            videoElement.play().then(() => {
+              setIsPlaying(true);
+            }).catch(() => setIsPlaying(false));
+
+            // Immediately unmute on the very first tap or click anywhere on the page
+            const handleUserGesture = () => {
+              if (videoRef.current) {
+                videoRef.current.muted = false;
+                videoRef.current.volume = 1;
+                setIsMuted(false);
+              }
+              window.removeEventListener("click", handleUserGesture);
+              window.removeEventListener("touchstart", handleUserGesture);
+              window.removeEventListener("keydown", handleUserGesture);
+            };
+            window.addEventListener("click", handleUserGesture, { once: true });
+            window.addEventListener("touchstart", handleUserGesture, { once: true });
+            window.addEventListener("keydown", handleUserGesture, { once: true });
+          } else {
+            setIsPlaying(false);
+          }
+        });
     }
 
     return () => {
@@ -327,13 +363,13 @@ const ReelCard = ({ reel, currentUser, onSkip, onImpression }) => {
         </div>
       )}
 
-      {/* Mute Button (Positioned cleanly inside the phone frame) */}
+      {/* Sound / Volume Toggle Button */}
       <button
         onClick={() => setIsMuted(!isMuted)}
         className="absolute top-4 right-4 z-20 bg-black/50 hover:bg-black/75 text-white p-2.5 rounded-full backdrop-blur-md border border-white/10 transition shadow-lg active:scale-95 cursor-pointer"
-        title={isMuted ? "Unmute" : "Mute"}
+        title={isMuted ? "Sound is Muted (Click to turn Sound ON)" : "Sound is ON (Click to Mute)"}
       >
-        {isMuted ? <FaVolumeMute size={16} /> : <FaVolumeUp size={16} />}
+        {isMuted ? <FaVolumeMute size={16} className="text-red-400" /> : <FaVolumeUp size={16} className="text-white" />}
       </button>
 
       {/* Added to Cart Feedback Toast */}
@@ -492,6 +528,8 @@ const Reels = () => {
   const [hasMore, setHasMore] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(0);
+  // Reel sounds always on by default (unmuted)
+  const [isMuted, setIsMuted] = useState(false);
 
   // Onboarding modal: shown to logged-in users whose preferredCuisines is empty.
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -810,6 +848,8 @@ const Reels = () => {
                   currentUser={userData}
                   onSkip={handleSkip}
                   onImpression={handleImpression}
+                  isMuted={isMuted}
+                  setIsMuted={setIsMuted}
                 />
               </motion.div>
             )}

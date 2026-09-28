@@ -60,7 +60,7 @@ export const editItem = async (req, res) => {
 export const getItemById = async (req, res) => {
     try {
         const itemId = req.params.itemId
-        const item = await Item.findById(itemId)
+        const item = await Item.findById(itemId).populate("shop", "name image city").lean()
         if (!item) {
             return res.status(400).json({ message: "item not found" })
         }
@@ -106,7 +106,7 @@ export const getItemByCity = async (req, res) => {
         }
         
         const shopIds = shops.map((shop) => shop._id)
-        const items = await Item.find({ shop: { $in: shopIds } }).lean()
+        const items = await Item.find({ shop: { $in: shopIds } }).populate("shop", "name image city").lean()
         return res.status(200).json(items)
 
     } catch (error) {

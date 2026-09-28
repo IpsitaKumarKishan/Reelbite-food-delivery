@@ -59,34 +59,35 @@ function CartItemCard({ data }) {
   };
 
   return (
-    <div className='flex items-center justify-between bg-white p-4 rounded-xl shadow border'>
-      <div className='flex items-center gap-4'>
-        <img src={data.image} alt={data.name || "Food"} className='w-20 h-20 object-cover rounded-lg border' />
-        <div>
-          <h1 className='font-medium text-gray-800'>{data.name}</h1>
-          <p className='text-sm text-gray-500'>₹{data.price} x {data.quantity}</p>
-          <p className="font-bold text-gray-900">₹{data.price * data.quantity}</p>
+    <div className='flex items-center justify-between bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-stone-200/80 gap-3'>
+      <div className='flex items-center gap-3 sm:gap-4 min-w-0'>
+        <img src={data.image} alt={data.name || "Food"} className='w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border border-stone-100 shrink-0' />
+        <div className='min-w-0'>
+          <h1 className='font-bold text-stone-900 text-sm sm:text-base truncate'>{data.name}</h1>
+          <p className='text-xs text-stone-500'>₹{data.price} x {data.quantity}</p>
+          <p className="font-extrabold text-[#ff5200] text-sm sm:text-base">₹{data.price * data.quantity}</p>
         </div>
       </div>
-      <div className='flex items-center gap-3'>
+      <div className='flex items-center gap-1.5 sm:gap-3 shrink-0'>
         <button
-          className='p-2 cursor-pointer bg-gray-100 rounded-full hover:bg-gray-200'
+          className='w-7 h-7 flex items-center justify-center cursor-pointer bg-stone-100 rounded-full hover:bg-stone-200 text-stone-700 transition'
           onClick={() => handleDecrease(data.quantity)}
         >
-          <FaMinus size={12} />
+          <FaMinus size={10} />
         </button>
-        <span className="font-semibold text-gray-800">{data.quantity}</span>
+        <span className="font-bold text-stone-900 text-xs sm:text-sm px-1">{data.quantity}</span>
         <button
-          className='p-2 cursor-pointer bg-gray-100 rounded-full hover:bg-gray-200'
+          className='w-7 h-7 flex items-center justify-center cursor-pointer bg-stone-100 rounded-full hover:bg-stone-200 text-stone-700 transition'
           onClick={() => handleIncrease(data.quantity)}
         >
-          <FaPlus size={12} />
+          <FaPlus size={10} />
         </button>
         <button
-          className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 cursor-pointer"
+          className="p-1.5 sm:p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 cursor-pointer ml-1 transition"
           onClick={handleRemove}
+          title="Remove item"
         >
-          <CiTrash size={18} />
+          <CiTrash size={17} />
         </button>
       </div>
     </div>

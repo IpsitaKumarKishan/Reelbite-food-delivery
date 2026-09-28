@@ -25,7 +25,7 @@ export default function NotificationDropdown({ onClose }) {
   };
 
   return (
-    <div className="absolute right-0 top-12 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-stone-200/90 z-[99999] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="absolute right-0 top-12 w-[calc(100vw-1.5rem)] sm:w-96 max-w-sm bg-white rounded-3xl shadow-2xl border border-stone-200/90 z-[99999] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-stone-100 bg-stone-50/70">
         <div className="flex items-center gap-2">

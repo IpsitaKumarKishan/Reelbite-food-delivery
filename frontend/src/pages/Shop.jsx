@@ -105,7 +105,7 @@ const SwiggyDishItem = ({ item, shopId }) => {
       </div>
 
       {/* Right Image + Swiggy ADD Button */}
-      <div className="relative w-28 h-28 shrink-0 flex flex-col items-center">
+      <div className="relative w-24 h-24 sm:w-28 sm:h-28 shrink-0 flex flex-col items-center">
         <img
           src={item.image}
           alt={item.name}
@@ -113,9 +113,9 @@ const SwiggyDishItem = ({ item, shopId }) => {
         />
 
         {/* Swiggy Style ADD Stepper Overlay */}
-        <div className="absolute -bottom-2 z-10 bg-white border border-stone-300 shadow-md rounded-xl overflow-hidden px-2 py-1 flex items-center justify-center min-w-[90px]">
+        <div className="absolute -bottom-2 z-10 bg-white border border-stone-300 shadow-md rounded-xl overflow-hidden px-2 py-1 flex items-center justify-center min-w-[84px] sm:min-w-[90px]">
           {quantityInCart > 0 ? (
-            <div className="flex items-center justify-between w-full text-[#ff5200] font-black text-sm">
+            <div className="flex items-center justify-between w-full text-[#ff5200] font-black text-xs sm:text-sm">
               <button onClick={handleDecrement} className="px-1.5 hover:bg-stone-100 rounded">
                 <FaMinus size={10} />
               </button>
@@ -186,14 +186,14 @@ function Shop() {
   });
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-stone-900 font-sans pb-20">
+    <div className="min-h-screen bg-[#f8f9fa] text-stone-900 font-sans pb-28 md:pb-20">
       <Nav />
 
       {/* Top Banner Header */}
       {shop && (
-        <div className="pt-20 max-w-5xl mx-auto px-4">
-          <div className="bg-white border border-stone-200 rounded-3xl overflow-hidden shadow-sm p-6 space-y-4">
-            <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">
+        <div className="pt-20 max-w-5xl mx-auto px-3 sm:px-4">
+          <div className="bg-white border border-stone-200 rounded-3xl overflow-hidden shadow-sm p-4 sm:p-6 space-y-4">
+            <div className="flex flex-col md:flex-row gap-5 sm:gap-6 items-start md:items-center">
               <div className="w-full md:w-48 h-36 rounded-2xl overflow-hidden shadow shrink-0 relative">
                 <img src={shop.image} alt={shop.name} className="w-full h-full object-cover" />
               </div>
@@ -207,7 +207,7 @@ function Shop() {
                   <span className="text-xs text-stone-500 font-semibold">• 25-35 mins</span>
                 </div>
 
-                <h1 className="text-3xl font-black text-stone-900 tracking-tight">{shop.name}</h1>
+                <h1 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">{shop.name}</h1>
                 <p className="text-xs text-stone-500 font-medium">North Indian, Fast Food, South Indian, Desserts</p>
                 <div className="flex items-center gap-1 text-xs text-stone-600 font-medium pt-1">
                   <FaLocationDot className="text-[#ff5200]" />
@@ -216,7 +216,7 @@ function Shop() {
               </div>
 
               {/* Offer Pill */}
-              <div className="bg-amber-50 border border-amber-200 text-amber-900 p-3 rounded-2xl flex items-center gap-3 shrink-0">
+              <div className="w-full md:w-auto bg-amber-50 border border-amber-200 text-amber-900 p-3 rounded-2xl flex items-center gap-3 shrink-0">
                 <FaTag className="text-[#ff5200] text-xl" />
                 <div>
                   <h5 className="font-extrabold text-xs">50% OFF UP TO ₹100</h5>
@@ -229,7 +229,7 @@ function Shop() {
       )}
 
       {/* Menu & Search Controls */}
-      <main className="max-w-5xl mx-auto px-4 mt-8 space-y-6">
+      <main className="max-w-5xl mx-auto px-3 sm:px-4 mt-8 space-y-6">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white border border-stone-200 p-4 rounded-2xl shadow-sm">
           {/* Search within Menu */}
           <div className="w-full sm:w-72 bg-stone-100 rounded-full px-4 py-2 flex items-center gap-2 border border-stone-200 focus-within:border-[#ff5200]">

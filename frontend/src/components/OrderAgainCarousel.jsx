@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
-import { FaCircleChevronLeft, FaCircleChevronRight, FaLeaf, FaDrumstickBite, FaRotateRight, FaPlus, FaCheck } from "react-icons/fa6";
+import { FaCircleChevronLeft, FaCircleChevronRight, FaLeaf, FaDrumstickBite, FaRotateRight, FaPlus, FaCheck, FaStore } from "react-icons/fa6";
+import { Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart } from "../redux/userSlice";
 import axios from "axios";
@@ -125,9 +126,21 @@ export default function OrderAgainCarousel({ items = [] }) {
                   <h3 className="font-bold text-stone-900 text-sm truncate mb-0.5" title={item.name}>
                     {item.name}
                   </h3>
-                  <p className="text-xs text-stone-500 truncate mb-2">
-                    {item.shop?.name || "Local Kitchen"}
-                  </p>
+                  {item.shop?._id || item.shop ? (
+                    <Link
+                      to={`/shop/${item.shop?._id || item.shop}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-stone-500 hover:text-[#ff5200] transition-colors truncate mb-2 max-w-full group/reorderShop"
+                      title={`Visit ${item.shop?.name || "Kitchen"}`}
+                    >
+                      <FaStore className="text-[10px] text-stone-400 group-hover/reorderShop:text-[#ff5200] shrink-0" />
+                      <span className="truncate hover:underline underline-offset-2">{item.shop?.name || "Local Kitchen"}</span>
+                    </Link>
+                  ) : (
+                    <p className="text-xs text-stone-500 truncate mb-2">
+                      {item.shop?.name || "Local Kitchen"}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between pt-2 border-t border-stone-100">

@@ -109,12 +109,12 @@ function UserDashboard() {
   }, [shopInMyCity, filters.minRating]);
 
   return (
-    <div className='w-full min-h-screen flex flex-col bg-[#f8f9fa] text-stone-900 font-sans pb-20 md:pb-12'>
+    <div className='w-full min-h-screen flex flex-col bg-[#f8f9fa] text-stone-900 font-sans pb-28 md:pb-12'>
       {/* Top Navbar */}
       <Nav />
 
       {/* Main Container */}
-      <main className="pt-[68px] sm:pt-[76px] max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 space-y-6">
+      <main className="pt-[68px] sm:pt-[76px] max-w-7xl mx-auto w-full px-3 sm:px-6 lg:px-8 space-y-6">
 
         {/* Search Results (if user is typing in Nav) */}
         {searchItems && searchItems.length > 0 && (
@@ -164,7 +164,7 @@ function UserDashboard() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 justify-items-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 justify-items-center">
             {filteredShops && filteredShops.length > 0 ? (
               filteredShops.map((shop) => (
                 <RestaurantCard
@@ -195,7 +195,7 @@ function UserDashboard() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 justify-items-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 justify-items-center">
             {filteredItems && filteredItems.length > 0 ? (
               filteredItems.map((item, index) => (
                 <FoodCard key={item._id || index} data={item} />

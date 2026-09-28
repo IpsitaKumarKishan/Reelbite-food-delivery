@@ -215,19 +215,19 @@ export default function AdminDashboard() {
   });
 
   return (
-    <div className="min-h-screen bg-[#faf8f5] text-stone-900 pb-24">
+    <div className="min-h-screen bg-[#faf8f5] text-stone-900 pb-28 md:pb-20">
       <Nav />
 
-      <main className="max-w-7xl mx-auto pt-24 px-4 sm:px-6 lg:px-8 space-y-6">
+      <main className="max-w-7xl mx-auto pt-24 px-3 sm:px-6 lg:px-8 space-y-6">
         {/* Governance Command Bar */}
-        <div className="bg-stone-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 border border-stone-800">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#ff5200] to-amber-500 flex items-center justify-center text-white text-2xl shadow-lg shrink-0">
+        <div className="bg-stone-900 text-white rounded-3xl p-4 sm:p-8 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 border border-stone-800">
+          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-[#ff5200] to-amber-500 flex items-center justify-center text-white text-xl sm:text-2xl shadow-lg shrink-0">
               <FaShieldHalved />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight">Super Admin Command Center</h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg sm:text-2xl font-black tracking-tight">Super Admin Command Center</h1>
                 <span className="bg-[#ff5200]/20 text-[#ff5200] border border-[#ff5200]/40 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                   Governance Live
                 </span>
@@ -238,7 +238,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={fetchAllData}
               className="flex items-center gap-2 px-4 py-2.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-2xl text-xs font-bold transition"
@@ -251,7 +251,7 @@ export default function AdminDashboard() {
 
         {/* Executive KPI Ribbon */}
         {metrics && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
             {/* KPI 1: Gross Merchandise Value */}
             <div className="bg-white rounded-3xl p-5 border border-stone-200/80 shadow-sm relative overflow-hidden group hover:border-[#ff5200]/40 transition">
               <div className="flex items-center justify-between">

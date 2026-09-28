@@ -62,18 +62,18 @@ function MyOrders() {
   }, [myOrders, userData]);
 
   return (
-    <div className='w-full min-h-screen bg-[#fff9f6] flex justify-center px-4 pb-24 md:pb-16'>
+    <div className='w-full min-h-screen bg-[#fff9f6] flex justify-center px-3 sm:px-4 pb-28 md:pb-16'>
       <div className='w-full max-w-[800px] pt-6'>
         {/* Header */}
         <div className='flex items-center justify-between mb-6 border-b border-amber-900/10 pb-4'>
-          <div className='flex items-center gap-3'>
+          <div className='flex items-center gap-2 sm:gap-3'>
             <button
               onClick={() => navigate("/")}
-              className='p-1.5 rounded-full hover:bg-stone-200/60 transition'
+              className='p-1.5 rounded-full hover:bg-stone-200/60 transition cursor-pointer'
             >
               <IoIosArrowRoundBack size={32} className='text-[#ff5200]' />
             </button>
-            <h1 className='text-2xl font-black text-stone-900'>
+            <h1 className='text-xl sm:text-2xl font-black text-stone-900'>
               {userData?.role === "owner" ? "Restaurant Orders & Revenue" : "My Orders"}
             </h1>
           </div>
@@ -81,18 +81,18 @@ function MyOrders() {
 
         {/* Owner Total Earnings Summary Banner */}
         {userData?.role === "owner" && (
-          <div className='bg-gradient-to-br from-stone-900 to-stone-950 rounded-3xl p-6 shadow-xl mb-8 border border-stone-800 text-white space-y-4'>
+          <div className='bg-gradient-to-br from-stone-900 to-stone-950 rounded-3xl p-4 sm:p-6 shadow-xl mb-8 border border-stone-800 text-white space-y-4'>
             <div className='flex items-center justify-between border-b border-stone-800 pb-3'>
-              <h2 className='text-sm font-black uppercase tracking-wider text-amber-400 flex items-center gap-2'>
+              <h2 className='text-xs sm:text-sm font-black uppercase tracking-wider text-amber-400 flex items-center gap-2'>
                 <FaWallet className="text-[#ff5200]" />
                 <span>Restaurant Revenue Dashboard</span>
               </h2>
-              <span className='text-[11px] bg-stone-800 text-stone-300 px-3 py-1 rounded-full font-bold'>
+              <span className='text-[10px] sm:text-[11px] bg-stone-800 text-stone-300 px-2.5 sm:px-3 py-1 rounded-full font-bold'>
                 Live Financials
               </span>
             </div>
 
-            <div className='grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1'>
+            <div className='grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 pt-1'>
               <div className='bg-stone-900/80 p-4 rounded-2xl border border-stone-800/80'>
                 <p className='text-[11px] font-bold text-stone-400 uppercase tracking-wider mb-1'>Total Revenue</p>
                 <p className='text-2xl font-black text-emerald-400'>₹{ownerEarnings.totalRevenue.toLocaleString()}</p>

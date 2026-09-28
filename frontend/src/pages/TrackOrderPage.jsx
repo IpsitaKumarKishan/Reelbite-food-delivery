@@ -110,13 +110,13 @@ function TrackOrderPage() {
   };
 
   return (
-    <div className='max-w-4xl mx-auto p-4 sm:p-6 flex flex-col gap-6 pb-20'>
+    <div className='max-w-4xl mx-auto p-3 sm:p-6 flex flex-col gap-5 sm:gap-6 pb-28 md:pb-20'>
       {/* Top Header */}
-      <div className='flex items-center justify-between'>
-        <div className='flex items-center gap-3 cursor-pointer' onClick={() => navigate("/")}>
+      <div className='flex items-center justify-between flex-wrap gap-3'>
+        <div className='flex items-center gap-2 sm:gap-3 cursor-pointer' onClick={() => navigate("/")}>
           <IoIosArrowRoundBack size={36} className='text-[#ff5200] hover:-translate-x-1 transition' />
           <div>
-            <h1 className='text-2xl font-black text-stone-900 tracking-tight'>Track Order</h1>
+            <h1 className='text-xl sm:text-2xl font-black text-stone-900 tracking-tight'>Track Order</h1>
             <p className='text-xs text-stone-500 font-medium'>Order ID: #{orderId?.slice(-6).toUpperCase()}</p>
           </div>
         </div>
@@ -135,7 +135,7 @@ function TrackOrderPage() {
 
       {/* Cancellation Window Alert Box */}
       {canCancel && remainingSeconds > 0 && (
-        <div className='bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-3 text-amber-900'>
+        <div className='bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900'>
           <div className='flex items-center gap-3'>
             <div className='w-8 h-8 rounded-full bg-amber-200 text-amber-800 flex items-center justify-center shrink-0'>
               <FaClock size={14} />

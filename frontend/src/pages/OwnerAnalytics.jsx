@@ -117,13 +117,13 @@ export default function OwnerAnalytics() {
     : "";
 
   return (
-    <div className="min-h-screen bg-[#faf8f5] text-stone-900 pb-20">
+    <div className="min-h-screen bg-[#faf8f5] text-stone-900 pb-28 md:pb-20">
       <Nav />
 
-      <main className="max-w-7xl mx-auto pt-24 px-4 sm:px-6 lg:px-8 space-y-6">
+      <main className="max-w-7xl mx-auto pt-24 px-3 sm:px-6 lg:px-8 space-y-6">
         {/* Header Ribbon */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
+        <div className="bg-white rounded-3xl p-4 sm:p-8 border border-stone-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
             <button
               onClick={() => navigate(-1)}
               className="p-3 bg-stone-100 hover:bg-stone-200 rounded-2xl text-stone-700 transition"
@@ -135,15 +135,15 @@ export default function OwnerAnalytics() {
               <img
                 src={shop.image}
                 alt={shop.name}
-                className="w-16 h-16 rounded-2xl object-cover border border-stone-100 shadow-sm shrink-0"
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border border-stone-100 shadow-sm shrink-0"
               />
             ) : (
-              <div className="w-16 h-16 rounded-2xl bg-orange-100 text-[#ff5200] flex items-center justify-center shrink-0">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-orange-100 text-[#ff5200] flex items-center justify-center shrink-0">
                 <FaStore size={24} />
               </div>
             )}
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight">{shop.name}</h1>
                 <span className="bg-emerald-100 text-emerald-700 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
@@ -156,7 +156,7 @@ export default function OwnerAnalytics() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-3 shrink-0 flex-wrap">
             <button
               onClick={fetchAnalytics}
               className="flex items-center gap-2 px-4 py-2.5 bg-stone-100 hover:bg-stone-200 rounded-2xl text-xs font-bold text-stone-700 transition"
@@ -175,7 +175,7 @@ export default function OwnerAnalytics() {
         </div>
 
         {/* Executive Metric Cards Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
           {/* Card 1: Today Revenue */}
           <div className="bg-white rounded-3xl p-5 border border-stone-200/80 shadow-sm relative overflow-hidden group hover:border-[#ff5200]/40 transition">
             <div className="flex items-center justify-between">

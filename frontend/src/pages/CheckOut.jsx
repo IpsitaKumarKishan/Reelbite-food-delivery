@@ -172,11 +172,11 @@ const openRazorpayWindow=(orderId,razorOrder)=>{
     setAddressInput(address)
   }, [address])
   return (
-    <div className='min-h-screen bg-[#fff9f6] flex items-center justify-center p-6'>
-      <div className=' absolute top-[20px] left-[20px] z-[10]' onClick={() => navigate("/")}>
+    <div className='min-h-screen bg-[#fff9f6] flex items-center justify-center p-3 sm:p-6 pb-28 md:pb-12 relative'>
+      <div className='absolute top-4 left-4 sm:top-6 sm:left-6 z-[10] cursor-pointer' onClick={() => navigate("/")}>
         <IoIosArrowRoundBack size={35} className='text-[#ff4d2d]' />
       </div>
-      <div className='w-full max-w-[900px] bg-white rounded-2xl shadow-xl p-6 space-y-6'>
+      <div className='w-full max-w-[900px] bg-white rounded-2xl shadow-xl p-4 sm:p-6 space-y-5 sm:space-y-6 mt-12 sm:mt-0'>
         <h1 className='text-2xl font-bold text-gray-800'>Checkout</h1>
 
         <section>
@@ -260,17 +260,19 @@ const openRazorpayWindow=(orderId,razorOrder)=>{
               </div>
 
             </div>
-            <div className={`flex items-center gap-3 rounded-xl border p-4 text-left transition ${paymentMethod === "online" ? "border-[#ff4d2d] bg-orange-50 shadow" : "border-gray-200 hover:border-gray-300"
+            <div className={`flex items-center gap-3 rounded-xl border p-4 text-left transition cursor-pointer ${paymentMethod === "online" ? "border-[#ff4d2d] bg-orange-50 shadow" : "border-gray-200 hover:border-gray-300"
               }`} onClick={() => setPaymentMethod("online")}>
 
-              <span className='inline-flex h-10 w-10 items-center justify-center rounded-full bg-purple-100'>
-                <FaMobileScreenButton className='text-purple-700 text-lg' />
-              </span>
-              <span className='inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100'>
-                <FaCreditCard className='text-blue-700 text-lg' />
-              </span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className='inline-flex h-9 w-9 items-center justify-center rounded-full bg-purple-100'>
+                  <FaMobileScreenButton className='text-purple-700 text-base' />
+                </span>
+                <span className='inline-flex h-9 w-9 items-center justify-center rounded-full bg-blue-100'>
+                  <FaCreditCard className='text-blue-700 text-base' />
+                </span>
+              </div>
               <div>
-                <p className='font-medium text-gray-800'>UPI / Credit / Debit Card</p>
+                <p className='font-medium text-gray-800 text-sm sm:text-base'>UPI / Card</p>
                 <p className='text-xs text-gray-500'>Pay Securely Online</p>
               </div>
             </div>

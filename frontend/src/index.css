@@ -10,6 +10,11 @@ h1, h2, h3, .font-display {
   font-family: var(--font-display);
 }
 
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 /* Lenis smooth scrolling base */
 html.lenis, html.lenis body {
   height: auto;

@@ -116,19 +116,19 @@ function UserOrderCard({ data }) {
                 </div>
             )}
 
-            <div className='flex justify-between items-center border-t pt-2 gap-2'>
-                <p className='font-semibold'>Total: ₹{data.totalAmount}</p>
-                <div className='flex items-center gap-2'>
+            <div className='flex flex-col sm:flex-row sm:items-center justify-between border-t pt-3 gap-3'>
+                <p className='font-bold text-stone-900 text-sm sm:text-base'>Total: ₹{data.totalAmount}</p>
+                <div className='flex items-center gap-2 flex-wrap'>
                     {data.shopOrders?.[0]?.status === "delivered" && (
                         <button
                             onClick={() => setShowRatingModal(true)}
-                            className='px-3.5 py-2 rounded-lg text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 transition flex items-center gap-1 cursor-pointer'
+                            className='px-3.5 py-2 rounded-xl text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 transition flex items-center gap-1 cursor-pointer'
                         >
                             <FaStar className="text-amber-500" size={12} />
                             <span>Rate Order</span>
                         </button>
                     )}
-                    <button className='bg-[#ff4d2d] hover:bg-[#e64526] text-white px-4 py-2 rounded-lg text-sm font-bold' onClick={() => navigate(`/track-order/${data._id}`)}>Track Order</button>
+                    <button className='bg-[#ff4d2d] hover:bg-[#e64526] text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition' onClick={() => navigate(`/track-order/${data._id}`)}>Track Order</button>
                 </div>
             </div>
 

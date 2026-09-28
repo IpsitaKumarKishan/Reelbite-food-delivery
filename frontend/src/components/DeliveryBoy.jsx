@@ -179,16 +179,16 @@ function DeliveryBoy() {
   }, [userData])
 
   return (
-    <div className='w-screen min-h-screen flex flex-col gap-5 items-center bg-[#fff9f6] overflow-y-auto pb-12'>
+    <div className='w-full min-h-screen flex flex-col gap-5 items-center bg-[#fff9f6] overflow-y-auto pb-28 md:pb-12 px-3 sm:px-4'>
       <Nav />
       <div className='w-full max-w-[800px] flex flex-col gap-5 items-center pt-20'>
-        <div className='bg-white rounded-2xl shadow-md p-5 flex flex-col justify-start items-center w-[90%] border border-orange-100 text-center gap-2'>
-          <h1 className='text-xl font-bold text-[#ff4d2d]'>Welcome, {userData?.fullName}</h1>
+        <div className='bg-white rounded-2xl shadow-md p-4 sm:p-5 flex flex-col justify-start items-center w-full border border-orange-100 text-center gap-2'>
+          <h1 className='text-lg sm:text-xl font-bold text-[#ff4d2d]'>Welcome, {userData?.fullName}</h1>
           <p className='text-[#ff4d2d] text-xs sm:text-sm'><span className='font-semibold'>Latitude:</span> {deliveryBoyLocation?.lat || 'Locating...'}, <span className='font-semibold'>Longitude:</span> {deliveryBoyLocation?.lon || 'Locating...'}</p>
         </div>
 
-        <div className='bg-white rounded-2xl shadow-md p-5 w-[90%] mb-2 border border-orange-100'>
-          <h1 className='text-lg font-bold mb-3 text-[#ff4d2d] '>Today Deliveries</h1>
+        <div className='bg-white rounded-2xl shadow-md p-4 sm:p-5 w-full mb-2 border border-orange-100'>
+          <h1 className='text-lg font-bold mb-3 text-[#ff4d2d]'>Today Deliveries</h1>
 
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={todayDeliveries}>
@@ -200,27 +200,27 @@ function DeliveryBoy() {
             </BarChart>
           </ResponsiveContainer>
 
-          <div className='max-w-sm mx-auto mt-6 p-6 bg-white rounded-2xl shadow-lg text-center border border-stone-100'>
-            <h1 className='text-xl font-semibold text-gray-800 mb-2'>Today's Earning</h1>
+          <div className='max-w-sm mx-auto mt-6 p-4 sm:p-6 bg-white rounded-2xl shadow-lg text-center border border-stone-100'>
+            <h1 className='text-lg sm:text-xl font-semibold text-gray-800 mb-2'>Today's Earning</h1>
             <span className='text-3xl font-bold text-green-600'>₹{totalEarning}</span>
           </div>
         </div>
 
         {!currentOrder && (
-          <div className='bg-white rounded-2xl p-5 shadow-md w-[90%] border border-orange-100'>
+          <div className='bg-white rounded-2xl p-4 sm:p-5 shadow-md w-full border border-orange-100'>
             <h1 className='text-lg font-bold mb-4 flex items-center gap-2 text-stone-800'>Available Orders</h1>
 
             <div className='space-y-4'>
               {availableAssignments?.length > 0 ? (
                 availableAssignments.map((a, index) => (
-                  <div className='border rounded-xl p-4 flex justify-between items-center bg-stone-50/50' key={index}>
+                  <div className='border rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-stone-50/50' key={index}>
                     <div>
                       <p className='text-sm font-bold text-stone-800'>{a?.shopName}</p>
                       <p className='text-xs text-stone-500 mt-0.5'><span className='font-semibold'>Address:</span> {a?.deliveryAddress.text}</p>
                       <p className='text-xs text-stone-400 mt-1'>{a.items.length} items | ₹{a.subtotal}</p>
                     </div>
                     <button
-                      className='bg-[#ff5200] hover:bg-[#c2410c] text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition'
+                      className='bg-[#ff5200] hover:bg-[#c2410c] text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition self-end sm:self-auto cursor-pointer'
                       onClick={() => acceptOrder(a.assignmentId)}
                     >
                       Accept
@@ -235,7 +235,7 @@ function DeliveryBoy() {
         )}
 
         {currentOrder && (
-          <div className='bg-white rounded-2xl p-5 shadow-md w-[90%] border border-orange-100 space-y-4'>
+          <div className='bg-white rounded-2xl p-4 sm:p-5 shadow-md w-full border border-orange-100 space-y-4'>
             <h2 className='text-lg font-bold text-stone-900'>📦 Active Order Assignment</h2>
             <div className='border border-stone-200 rounded-xl p-4 bg-stone-50/50 space-y-2.5'>
               <div className="flex items-center justify-between">

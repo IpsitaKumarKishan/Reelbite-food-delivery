@@ -13,7 +13,7 @@ const RestaurantCard = ({ shop, onClick }) => {
   return (
     <div
       onClick={onClick}
-      className="w-full sm:w-[280px] md:w-[300px] bg-white rounded-2xl border border-stone-200/80 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer group flex flex-col"
+      className="w-full max-w-[320px] sm:max-w-none sm:w-[280px] md:w-[300px] bg-white rounded-2xl border border-stone-200/80 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer group flex flex-col mx-auto sm:mx-0"
     >
       {/* Cover Image Container */}
       <div className="relative w-full h-[180px] bg-stone-100 overflow-hidden">
