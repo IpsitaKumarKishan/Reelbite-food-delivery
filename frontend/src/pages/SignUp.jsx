@@ -554,12 +554,12 @@ function SignUp() {
 
         {/* Footer Link */}
         <p className="mt-6 text-center text-xs text-stone-500">
-          Already have an account?{' '}
+          already have account?{' '}
           <button
             onClick={() => navigate('/signin')}
             className="font-bold text-[#ff5200] hover:underline cursor-pointer"
           >
-            Sign In
+            sign in
           </button>
         </p>
       </motion.div>

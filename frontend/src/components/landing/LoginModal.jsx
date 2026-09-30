@@ -359,32 +359,6 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
               </p>
             </div>
 
-            {/* Mode Toggle Tabs */}
-            <div className="mb-6 flex rounded-xl bg-stone-100 p-1">
-              <button
-                type="button"
-                onClick={() => resetMode('signin')}
-                className={`flex-1 rounded-lg py-2 text-xs sm:text-sm font-bold transition-all ${
-                  mode === 'signin'
-                    ? 'bg-white text-stone-900 shadow-sm'
-                    : 'text-stone-500 hover:text-stone-900'
-                }`}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => resetMode('signup')}
-                className={`flex-1 rounded-lg py-2 text-xs sm:text-sm font-bold transition-all ${
-                  mode === 'signup'
-                    ? 'bg-white text-stone-900 shadow-sm'
-                    : 'text-stone-500 hover:text-stone-900'
-                }`}
-              >
-                Sign Up
-              </button>
-            </div>
-
             {/* Error Message Banner */}
             <AnimatePresence>
               {err && (
@@ -695,6 +669,33 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
                   <FcGoogle className="h-5 w-5" />
                   <span>Continue with Google</span>
                 </button>
+
+                {/* Bottom Toggle Switcher */}
+                <div className="mt-5 text-center text-xs text-stone-600 font-medium">
+                  {mode === 'signin' ? (
+                    <p>
+                      do not have account?{' '}
+                      <button
+                        type="button"
+                        onClick={() => resetMode('signup')}
+                        className="font-bold text-[#ff5200] hover:underline cursor-pointer"
+                      >
+                        sign up
+                      </button>
+                    </p>
+                  ) : (
+                    <p>
+                      already have account?{' '}
+                      <button
+                        type="button"
+                        onClick={() => resetMode('signin')}
+                        className="font-bold text-[#ff5200] hover:underline cursor-pointer"
+                      >
+                        sign in
+                      </button>
+                    </p>
+                  )}
+                </div>
               </>
             )}
           </motion.div>
