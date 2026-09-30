@@ -101,26 +101,34 @@ export default function RestaurantShowcase({ onOpenSignUp }) {
     if (!track || !section) return;
 
     const ctx = gsap.context(() => {
-      // Calculate total horizontal scroll distance
-      const scrollDistance = track.scrollWidth - window.innerWidth + 80;
+      const getScrollDistance = () => Math.max(0, track.scrollWidth - window.innerWidth + 80);
 
-      if (scrollDistance > 0 && window.innerWidth >= 768) {
+      if (window.innerWidth >= 768) {
         gsap.to(track, {
-          x: () => -scrollDistance,
+          x: () => -getScrollDistance(),
           ease: 'none',
           scrollTrigger: {
             trigger: section,
             start: 'top top',
-            end: () => `+=${scrollDistance}`,
+            end: () => `+=${getScrollDistance()}`,
             pin: true,
-            scrub: 1,
+            scrub: 0.8,
             invalidateOnRefresh: true,
+            anticipatePin: 1,
           },
         });
       }
     }, sectionRef);
 
-    return () => ctx.revert();
+    // Refresh ScrollTrigger to calculate accurate coordinates once mounted
+    const refreshTimer = setTimeout(() => {
+      ScrollTrigger.refresh();
+    }, 200);
+
+    return () => {
+      clearTimeout(refreshTimer);
+      ctx.revert();
+    };
   }, []);
 
   return (

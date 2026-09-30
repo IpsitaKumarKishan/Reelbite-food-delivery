@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Film, ShoppingBag, MapPin, Sparkles, CheckCircle2, ArrowRight } from 'lucide-react';
@@ -72,6 +73,8 @@ export default function HowItWorks({ onOpenSignUp }) {
         end: '+=200%',
         pin: true,
         scrub: 0.6,
+        invalidateOnRefresh: true,
+        anticipatePin: 1,
         onUpdate: (self) => {
           const progress = self.progress;
           const stepIndex = Math.min(
@@ -83,7 +86,14 @@ export default function HowItWorks({ onOpenSignUp }) {
       });
     }, containerRef);
 
-    return () => ctx.revert();
+    const refreshTimer = setTimeout(() => {
+      ScrollTrigger.refresh();
+    }, 200);
+
+    return () => {
+      clearTimeout(refreshTimer);
+      ctx.revert();
+    };
   }, [steps.length]);
 
   return (
@@ -183,21 +193,28 @@ export default function HowItWorks({ onOpenSignUp }) {
           <div className="lg:col-span-6 relative flex items-center justify-center">
             <div className="relative w-full max-w-[460px] aspect-[4/3] rounded-3xl overflow-hidden p-2 bg-gradient-to-b from-white/15 to-white/5 border border-white/20 shadow-2xl backdrop-blur-xl">
               <div className="relative w-full h-full rounded-2xl overflow-hidden bg-stone-950 flex items-center justify-center">
-                <img
-                  src={steps[activeStep].image}
-                  alt={steps[activeStep].title}
-                  className="w-full h-full object-cover transition-all duration-700 ease-out transform scale-100 hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                <AnimatePresence mode="wait">
+                  <motion.img
+                    key={steps[activeStep].id}
+                    src={steps[activeStep].image}
+                    alt={steps[activeStep].title}
+                    initial={{ opacity: 0, scale: 1.08 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.96 }}
+                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                </AnimatePresence>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none" />
 
                 {/* Live Preview Floating Badge */}
-                <div className="absolute top-4 right-4 flex items-center gap-2 rounded-full bg-black/60 backdrop-blur-md border border-white/20 px-3 py-1.5">
+                <div className="absolute top-4 right-4 flex items-center gap-2 rounded-full bg-black/60 backdrop-blur-md border border-white/20 px-3 py-1.5 z-10">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
                   <span className="text-[11px] font-bold text-white">Live Step 0{activeStep + 1}</span>
                 </div>
 
                 {/* Bottom Card Context */}
-                <div className="absolute bottom-4 left-4 right-4 p-4 rounded-2xl bg-black/70 backdrop-blur-md border border-white/10">
+                <div className="absolute bottom-4 left-4 right-4 p-4 rounded-2xl bg-black/70 backdrop-blur-md border border-white/10 z-10">
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-[10px] uppercase font-black text-[#ff5200] tracking-wider">

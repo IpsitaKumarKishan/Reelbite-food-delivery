@@ -34,7 +34,19 @@ export default function LandingNav({ onOpenLogin, onOpenSignUp }) {
     }
     const target = document.querySelector(href);
     if (target) {
-      target.scrollIntoView({ behavior: 'smooth' });
+      if (window.__lenis) {
+        window.__lenis.scrollTo(target, { offset: -60, duration: 1.2 });
+      } else {
+        target.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  };
+
+  const handleLogoClick = () => {
+    if (window.__lenis) {
+      window.__lenis.scrollTo(0, { duration: 1.2 });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -49,7 +61,7 @@ export default function LandingNav({ onOpenLogin, onOpenSignUp }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         {/* Brand Logo */}
         <div
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          onClick={handleLogoClick}
           className="flex items-center gap-2.5 cursor-pointer group select-none"
         >
           <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-[#ff4d2d] to-amber-500 flex items-center justify-center text-white shadow-lg shadow-[#ff4d2d]/30 group-hover:scale-105 transition-transform duration-200">

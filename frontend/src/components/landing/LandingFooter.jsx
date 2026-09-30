@@ -7,7 +7,11 @@ export default function LandingFooter({ onOpenLogin, onOpenSignUp }) {
   const navigate = useNavigate();
 
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (window.__lenis) {
+      window.__lenis.scrollTo(0, { duration: 1.2 });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const cuisines = [

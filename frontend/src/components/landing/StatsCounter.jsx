@@ -73,8 +73,9 @@ export default function StatsCounter() {
     const ctx = gsap.context(() => {
       ScrollTrigger.create({
         trigger: sectionRef.current,
-        start: 'top 80%',
+        start: 'top 85%',
         once: true,
+        invalidateOnRefresh: true,
         onEnter: () => {
           const proxy = {
             orders: 0,
@@ -103,7 +104,14 @@ export default function StatsCounter() {
       });
     }, sectionRef);
 
-    return () => ctx.revert();
+    const refreshTimer = setTimeout(() => {
+      ScrollTrigger.refresh();
+    }, 200);
+
+    return () => {
+      clearTimeout(refreshTimer);
+      ctx.revert();
+    };
   }, []);
 
   return (

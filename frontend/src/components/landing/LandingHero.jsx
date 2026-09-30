@@ -8,7 +8,7 @@ import burgerImg from '../../assets/image5.jpg';
 import pizzaImg from '../../assets/image4.avif';
 import dessertImg from '../../assets/image3.jpg';
 
-export default function LandingHero({ onOpenSignUp, onOpenLogin }) {
+export default function LandingHero({ onOpenSignUp, onOpenLogin, isReady = true }) {
   const primaryMagneticRef = useMagnetic(0.3, 20);
   const secondaryMagneticRef = useMagnetic(0.2, 15);
   const navigate = useNavigate();
@@ -24,6 +24,19 @@ export default function LandingHero({ onOpenSignUp, onOpenLogin }) {
     { text: 'the', highlight: false },
     { text: 'way.', highlight: true },
   ];
+
+  const handleExploreRestaurants = () => {
+    const el = document.getElementById('restaurants');
+    if (el) {
+      if (window.__lenis) {
+        window.__lenis.scrollTo(el, { offset: -40, duration: 1.2 });
+      } else {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
+    } else {
+      navigate('/reels');
+    }
+  };
 
   return (
     <section
@@ -51,7 +64,7 @@ export default function LandingHero({ onOpenSignUp, onOpenLogin }) {
           {/* Tagline Pill */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            animate={isReady ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
             transition={{ duration: 0.5, delay: 0.1 }}
             className="inline-flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-4 py-1.5 backdrop-blur-md mb-6 shadow-inner"
           >
@@ -67,10 +80,10 @@ export default function LandingHero({ onOpenSignUp, onOpenLogin }) {
               <motion.span
                 key={index}
                 initial={{ opacity: 0, y: 35, rotateZ: 2 }}
-                animate={{ opacity: 1, y: 0, rotateZ: 0 }}
+                animate={isReady ? { opacity: 1, y: 0, rotateZ: 0 } : { opacity: 0, y: 35, rotateZ: 2 }}
                 transition={{
                   duration: 0.6,
-                  delay: 0.2 + index * 0.06,
+                  delay: 0.15 + index * 0.06,
                   ease: [0.215, 0.61, 0.355, 1],
                 }}
                 className={`inline-block mr-2.5 sm:mr-3.5 ${
@@ -87,8 +100,8 @@ export default function LandingHero({ onOpenSignUp, onOpenLogin }) {
           {/* Subheading */}
           <motion.p
             initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.7 }}
+            animate={isReady ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+            transition={{ duration: 0.6, delay: 0.65 }}
             className="mt-6 max-w-2xl text-base sm:text-lg text-stone-300 font-normal leading-relaxed"
           >
             Explore top-rated local eateries, watch real-time 4K food reels, and indulge in gourmet flavors delivered piping-hot to your doorstep with live GPS tracking.
@@ -97,8 +110,8 @@ export default function LandingHero({ onOpenSignUp, onOpenLogin }) {
           {/* CTA Button Group with Magnetic Physics */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.85 }}
+            animate={isReady ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+            transition={{ duration: 0.6, delay: 0.8 }}
             className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto"
           >
             {/* Primary Magnetic CTA */}
@@ -115,11 +128,7 @@ export default function LandingHero({ onOpenSignUp, onOpenLogin }) {
             {/* Secondary Magnetic CTA */}
             <div ref={secondaryMagneticRef} className="w-full sm:w-auto">
               <button
-                onClick={() => {
-                  const el = document.getElementById('restaurants');
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  else navigate('/reels');
-                }}
+                onClick={handleExploreRestaurants}
                 className="w-full sm:w-auto flex items-center justify-center gap-2.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 px-7 py-4 font-display text-base font-bold text-stone-200 hover:text-white transition duration-200 backdrop-blur-md cursor-pointer"
               >
                 <Film className="h-4 w-4 text-[#ff5200]" />
@@ -131,8 +140,8 @@ export default function LandingHero({ onOpenSignUp, onOpenLogin }) {
           {/* Trust Metrics Pill */}
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 1.05 }}
+            animate={isReady ? { opacity: 1 } : { opacity: 0 }}
+            transition={{ duration: 0.8, delay: 0.95 }}
             className="mt-10 flex items-center gap-6 text-stone-400 text-xs font-semibold"
           >
             <div className="flex items-center gap-1.5">
@@ -160,8 +169,8 @@ export default function LandingHero({ onOpenSignUp, onOpenLogin }) {
           {/* Main Visual Centerpiece */}
           <motion.div
             initial={{ opacity: 0, scale: 0.85, rotate: -3 }}
-            animate={{ opacity: 1, scale: 1, rotate: 0 }}
-            transition={{ duration: 0.8, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            animate={isReady ? { opacity: 1, scale: 1, rotate: 0 } : { opacity: 0, scale: 0.85, rotate: -3 }}
+            transition={{ duration: 0.8, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="relative w-full max-w-[420px] aspect-square rounded-3xl overflow-hidden p-2 bg-gradient-to-b from-white/15 to-white/5 border border-white/20 shadow-2xl backdrop-blur-xl group"
           >
             <div className="relative w-full h-full rounded-2xl overflow-hidden bg-stone-900">
@@ -199,8 +208,8 @@ export default function LandingHero({ onOpenSignUp, onOpenLogin }) {
           {/* Floating Pill 1: Fast Delivery (Top Right) */}
           <motion.div
             initial={{ opacity: 0, x: 40, y: -20 }}
-            animate={{ opacity: 1, x: 0, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.75 }}
+            animate={isReady ? { opacity: 1, x: 0, y: 0 } : { opacity: 0, x: 40, y: -20 }}
+            transition={{ duration: 0.6, delay: 0.7 }}
             className="absolute -top-6 -right-2 sm:-right-6 flex items-center gap-2.5 rounded-2xl bg-stone-900/90 border border-white/15 px-4 py-2.5 backdrop-blur-xl shadow-2xl animate-float-gentle"
           >
             <div className="h-9 w-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
@@ -215,8 +224,8 @@ export default function LandingHero({ onOpenSignUp, onOpenLogin }) {
           {/* Floating Pill 2: 4K Reels (Bottom Left) */}
           <motion.div
             initial={{ opacity: 0, x: -40, y: 20 }}
-            animate={{ opacity: 1, x: 0, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.9 }}
+            animate={isReady ? { opacity: 1, x: 0, y: 0 } : { opacity: 0, x: -40, y: 20 }}
+            transition={{ duration: 0.6, delay: 0.85 }}
             className="absolute -bottom-6 -left-2 sm:-left-8 flex items-center gap-3 rounded-2xl bg-stone-900/90 border border-white/15 px-4 py-3 backdrop-blur-xl shadow-2xl"
           >
             <div className="h-9 w-9 rounded-xl bg-[#ff4d2d]/20 text-[#ff4d2d] flex items-center justify-center">
