@@ -476,13 +476,11 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
                         }}
                         placeholder="9876543210"
                         autoComplete="tel"
-                        className={`w-full rounded-xl border ${
-                          mode === 'signup' && isPhoneVerified
+                        className={`w-full rounded-xl border ${mode === 'signup' && isPhoneVerified
                             ? 'border-emerald-300 bg-emerald-50/20'
                             : 'border-stone-200 bg-stone-50/50'
-                        } py-2.5 pl-12 ${
-                          mode === 'signup' ? 'pr-28' : 'pr-4'
-                        } text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20`}
+                          } py-2.5 pl-12 ${mode === 'signup' ? 'pr-28' : 'pr-4'
+                          } text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20`}
                         required
                       />
 
@@ -621,11 +619,10 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
                             key={r.id}
                             type="button"
                             onClick={() => setRole(r.id)}
-                            className={`rounded-xl py-2 text-xs font-bold transition-all border ${
-                              role === r.id
+                            className={`rounded-xl py-2 text-xs font-bold transition-all border ${role === r.id
                                 ? 'bg-[#ff5200] text-white border-[#ff5200] shadow-sm'
                                 : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100'
-                            }`}
+                              }`}
                           >
                             {r.label}
                           </button>
@@ -674,7 +671,7 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
                 <div className="mt-5 text-center text-xs text-stone-600 font-medium">
                   {mode === 'signin' ? (
                     <p>
-                      do not have account?{' '}
+                      don't have an account?{' '}
                       <button
                         type="button"
                         onClick={() => resetMode('signup')}
@@ -685,7 +682,7 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
                     </p>
                   ) : (
                     <p>
-                      already have account?{' '}
+                      already have an account?{' '}
                       <button
                         type="button"
                         onClick={() => resetMode('signin')}
