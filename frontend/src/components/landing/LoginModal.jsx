@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Eye, EyeOff, Lock, Mail, User, Phone, UtensilsCrossed, AlertCircle, ArrowRight } from 'lucide-react';
+import { X, Eye, EyeOff, Lock, User, Phone, UtensilsCrossed, AlertCircle, ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { FcGoogle } from 'react-icons/fc';
 import { ClipLoader } from 'react-spinners';
 import axios from 'axios';
@@ -13,10 +13,9 @@ import { auth } from '../../../firebase';
 
 export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) {
   const [mode, setMode] = useState(initialMode); // 'signin' | 'signup'
-  const [email, setEmail] = useState('');
+  const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [mobile, setMobile] = useState('');
   const [role, setRole] = useState('user');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -24,20 +23,43 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
   const [googlePending, setGooglePending] = useState(null);
   const [pendingMobile, setPendingMobile] = useState('');
 
+  // Phone OTP Verification States (for SignUp)
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [phoneOtp, setPhoneOtp] = useState('');
+  const [otpTimer, setOtpTimer] = useState(0);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [devOtpHint, setDevOtpHint] = useState('');
+
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
   useEffect(() => {
     setMode(initialMode);
     setErr('');
-    setEmail('');
     setPassword('');
     setFullName('');
     setMobile('');
+    setIsPhoneVerified(false);
+    setOtpSent(false);
+    setPhoneOtp('');
+    setOtpTimer(0);
     setGooglePending(null);
     setPendingMobile('');
     setShowPassword(false);
   }, [initialMode, isOpen]);
+
+  // Countdown timer for OTP resend
+  useEffect(() => {
+    let interval = null;
+    if (otpTimer > 0) {
+      interval = setInterval(() => {
+        setOtpTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [otpTimer]);
 
   // Handle ESC key to close modal
   useEffect(() => {
@@ -50,13 +72,80 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  const checkClientPhone = (raw) => {
+    let clean = String(raw || '').trim().replace(/[\s\-\(\)\.]/g, '');
+    if (clean.startsWith('+91')) clean = clean.slice(3);
+    else if (clean.startsWith('0091')) clean = clean.slice(4);
+    else if (clean.length === 12 && clean.startsWith('91') && /^[6-9]/.test(clean.slice(2))) clean = clean.slice(2);
+    else if (clean.length === 11 && clean.startsWith('0') && /^[6-9]/.test(clean.slice(1))) clean = clean.slice(1);
+    clean = clean.replace(/\D/g, '');
+
+    if (!clean) return { valid: false, msg: 'Mobile phone number is required.' };
+    if (clean.length !== 10) return { valid: false, msg: `Mobile number must be exactly 10 digits (entered ${clean.length}).` };
+    if (!/^[6-9]/.test(clean)) return { valid: false, msg: 'Mobile number must start with 6, 7, 8, or 9.' };
+    if (/^(\d)\1{9}$/.test(clean)) return { valid: false, msg: 'Invalid mobile number: repetitive digits not allowed.' };
+    if (['1234567890', '0123456789', '9876543210'].includes(clean)) return { valid: false, msg: 'Invalid mobile number: dummy sequential numbers not allowed.' };
+    return { valid: true, clean };
+  };
+
+  const handleSendPhoneOtp = async () => {
+    const phoneRes = checkClientPhone(mobile);
+    if (!phoneRes.valid) {
+      setErr(phoneRes.msg);
+      return;
+    }
+    setSendingOtp(true);
+    setErr('');
+    try {
+      const res = await axios.post(
+        `${serverUrl}/api/auth/send-phone-otp`,
+        { mobile: phoneRes.clean },
+        { withCredentials: true }
+      );
+      setOtpSent(true);
+      setOtpTimer(60);
+      if (res.data?.devOtp) {
+        setDevOtpHint(res.data.devOtp);
+      }
+    } catch (error) {
+      setErr(error?.response?.data?.message || 'Failed to send OTP to mobile number');
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleVerifyPhoneOtp = async () => {
+    const phoneRes = checkClientPhone(mobile);
+    if (!phoneRes.valid) {
+      setErr(phoneRes.msg);
+      return;
+    }
+    if (!phoneOtp || phoneOtp.length !== 6) {
+      setErr('Please enter the 6-digit OTP received on your mobile phone.');
+      return;
+    }
+    setVerifyingOtp(true);
+    setErr('');
+    try {
+      await axios.post(
+        `${serverUrl}/api/auth/verify-phone-otp`,
+        { mobile: phoneRes.clean, otp: phoneOtp.trim() },
+        { withCredentials: true }
+      );
+      setIsPhoneVerified(true);
+      setErr('');
+    } catch (error) {
+      setErr(error?.response?.data?.message || 'Invalid or expired OTP. Please try again.');
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
   const validateForm = () => {
     if (mode === 'signin') {
-      const trimmed = email.trim();
-      const isEmail = trimmed.includes('@');
-      const isPhone = /^\d{10}$/.test(trimmed.replace(/[\s+-]/g, ''));
-      if (!isEmail && !isPhone) {
-        setErr('Please enter a valid email address or 10-digit mobile number.');
+      const phoneRes = checkClientPhone(mobile);
+      if (!phoneRes.valid) {
+        setErr(phoneRes.msg);
         return false;
       }
     } else {
@@ -64,13 +153,13 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
         setErr('Please enter your full name.');
         return false;
       }
-      const cleanMobile = mobile.replace(/\D/g, '');
-      if (!cleanMobile || cleanMobile.length !== 10 || cleanMobile === '0000000000') {
-        setErr('A valid 10-digit mobile number is mandatory.');
+      const phoneRes = checkClientPhone(mobile);
+      if (!phoneRes.valid) {
+        setErr(phoneRes.msg);
         return false;
       }
-      if (!email || !email.includes('@')) {
-        setErr('Please enter a valid email address.');
+      if (!isPhoneVerified) {
+        setErr('Please verify your mobile number with OTP before completing registration.');
         return false;
       }
     }
@@ -88,9 +177,10 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
     setLoading(true);
     setErr('');
     try {
+      const cleanMobile = mobile.replace(/\D/g, '');
       const result = await axios.post(
         `${serverUrl}/api/auth/signin`,
-        { email: email.trim(), password },
+        { mobile: cleanMobile, password },
         { withCredentials: true }
       );
       dispatch(setUserData(result.data));
@@ -114,10 +204,10 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
     setLoading(true);
     setErr('');
     try {
-      const cleanMobile = mobile.replace(/\D/g, '');
+      const phoneRes = checkClientPhone(mobile);
       const result = await axios.post(
         `${serverUrl}/api/auth/signup`,
-        { fullName, email: email.trim(), password, mobile: cleanMobile, role },
+        { fullName: fullName.trim(), password, mobile: phoneRes.clean, role },
         { withCredentials: true }
       );
       dispatch(setUserData(result.data));
@@ -210,6 +300,19 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
     }
   };
 
+  const resetMode = (newMode) => {
+    setMode(newMode);
+    setErr('');
+    setPassword('');
+    setFullName('');
+    setMobile('');
+    setIsPhoneVerified(false);
+    setOtpSent(false);
+    setPhoneOtp('');
+    setOtpTimer(0);
+    setShowPassword(false);
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -229,7 +332,7 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 sm:p-8 shadow-2xl border border-stone-100 z-10"
+            className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-8 shadow-2xl border border-stone-100 z-10"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close Button */}
@@ -251,8 +354,8 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
               </h2>
               <p className="mt-1 text-xs sm:text-sm text-stone-500">
                 {mode === 'signin'
-                  ? 'Sign in to order your favorite cravings & watch food reels'
-                  : 'Create an account to start savoring fast deliveries'}
+                  ? 'Sign in with your mobile number & watch food reels'
+                  : 'Verify your phone number with OTP to start savoring fast deliveries'}
               </p>
             </div>
 
@@ -260,15 +363,7 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
             <div className="mb-6 flex rounded-xl bg-stone-100 p-1">
               <button
                 type="button"
-                onClick={() => {
-                  setMode('signin');
-                  setErr('');
-                  setEmail('');
-                  setPassword('');
-                  setFullName('');
-                  setMobile('');
-                  setShowPassword(false);
-                }}
+                onClick={() => resetMode('signin')}
                 className={`flex-1 rounded-lg py-2 text-xs sm:text-sm font-bold transition-all ${
                   mode === 'signin'
                     ? 'bg-white text-stone-900 shadow-sm'
@@ -279,15 +374,7 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setMode('signup');
-                  setErr('');
-                  setEmail('');
-                  setPassword('');
-                  setFullName('');
-                  setMobile('');
-                  setShowPassword(false);
-                }}
+                onClick={() => resetMode('signup')}
                 className={`flex-1 rounded-lg py-2 text-xs sm:text-sm font-bold transition-all ${
                   mode === 'signup'
                     ? 'bg-white text-stone-900 shadow-sm'
@@ -328,8 +415,8 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
 
                 <div>
                   <label className="block text-xs font-bold text-stone-700 mb-1">10-Digit Mobile Number</label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-2.5 text-xs font-bold text-stone-400">+91</span>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3.5 text-xs font-bold text-stone-400">+91</span>
                     <input
                       type="tel"
                       maxLength={10}
@@ -368,63 +455,147 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
               </form>
             ) : (
               <>
-                {/* Form */}
+                {/* Main Form */}
                 <form onSubmit={mode === 'signin' ? handleSignIn : handleSignUp} className="space-y-3.5">
                   {mode === 'signup' && (
-                    <>
-                      <div>
-                        <label className="block text-xs font-bold text-stone-700 mb-1">Full Name</label>
-                        <div className="relative">
-                          <User className="absolute left-3.5 top-3 h-4 w-4 text-stone-400" />
-                          <input
-                            type="text"
-                            value={fullName}
-                            onChange={(e) => setFullName(e.target.value)}
-                            placeholder="John Doe"
-                            autoComplete="off"
-                            className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-2.5 pl-10 pr-4 text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
-                            required
-                          />
-                        </div>
+                    <div>
+                      <label className="block text-xs font-bold text-stone-700 mb-1">Full Name</label>
+                      <div className="relative">
+                        <User className="absolute left-3.5 top-3 h-4 w-4 text-stone-400" />
+                        <input
+                          type="text"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          placeholder="John Doe"
+                          autoComplete="off"
+                          className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-2.5 pl-10 pr-4 text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
+                          required
+                        />
                       </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-stone-700 mb-1">Mobile Number</label>
-                        <div className="relative">
-                          <Phone className="absolute left-3.5 top-3 h-4 w-4 text-stone-400" />
-                          <input
-                            type="tel"
-                            maxLength={10}
-                            value={mobile}
-                            onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                            placeholder="9876543210"
-                            autoComplete="off"
-                            className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-2.5 pl-10 pr-4 text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
-                            required
-                          />
-                        </div>
-                      </div>
-                    </>
+                    </div>
                   )}
 
+                  {/* Mobile Number Field */}
                   <div>
-                    <label className="block text-xs font-bold text-stone-700 mb-1">
-                      {mode === 'signin' ? 'Email or 10-Digit Mobile' : 'Email Address'}
-                    </label>
-                    <div className="relative">
-                      <Mail className="absolute left-3.5 top-3 h-4 w-4 text-stone-400" />
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-stone-700">Mobile Number</label>
+                      {mode === 'signup' && isPhoneVerified && (
+                        <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Verified
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative flex items-center">
+                      <span className="absolute left-3.5 text-xs font-bold text-stone-400">+91</span>
                       <input
-                        type="text"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder={mode === 'signin' ? 'you@example.com or 9876543210' : 'you@example.com'}
-                        autoComplete="username"
-                        className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-2.5 pl-10 pr-4 text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
+                        type="tel"
+                        maxLength={10}
+                        disabled={mode === 'signup' && isPhoneVerified}
+                        value={mobile}
+                        onChange={(e) => {
+                          setMobile(e.target.value.replace(/\D/g, '').slice(0, 10));
+                          if (mode === 'signup') {
+                            setIsPhoneVerified(false);
+                            setOtpSent(false);
+                          }
+                        }}
+                        placeholder="9876543210"
+                        autoComplete="tel"
+                        className={`w-full rounded-xl border ${
+                          mode === 'signup' && isPhoneVerified
+                            ? 'border-emerald-300 bg-emerald-50/20'
+                            : 'border-stone-200 bg-stone-50/50'
+                        } py-2.5 pl-12 ${
+                          mode === 'signup' ? 'pr-28' : 'pr-4'
+                        } text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20`}
                         required
                       />
+
+                      {mode === 'signup' && (
+                        !isPhoneVerified ? (
+                          <button
+                            type="button"
+                            onClick={handleSendPhoneOtp}
+                            disabled={sendingOtp || otpTimer > 0 || mobile.replace(/\D/g, '').length !== 10}
+                            className="absolute right-2 px-3 py-1.5 rounded-lg bg-[#ff5200] text-white text-xs font-bold hover:bg-[#e04800] transition active:scale-95 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                          >
+                            {sendingOtp ? (
+                              <ClipLoader size={12} color="#ffffff" />
+                            ) : otpTimer > 0 ? (
+                              `Resend (${otpTimer}s)`
+                            ) : otpSent ? (
+                              'Resend OTP'
+                            ) : (
+                              'Send OTP'
+                            )}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsPhoneVerified(false);
+                              setOtpSent(false);
+                              setPhoneOtp('');
+                            }}
+                            className="absolute right-3 text-xs font-bold text-stone-400 hover:text-stone-700 underline cursor-pointer"
+                          >
+                            Change
+                          </button>
+                        )
+                      )}
                     </div>
+
+                    {/* Animated OTP Input Card when OTP is sent & not yet verified */}
+                    <AnimatePresence>
+                      {mode === 'signup' && otpSent && !isPhoneVerified && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0, y: -6 }}
+                          animate={{ opacity: 1, height: 'auto', y: 0 }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="mt-2.5 p-3 rounded-2xl bg-orange-50/80 border border-orange-200/80 space-y-2"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-stone-700 flex items-center gap-1.5">
+                              <ShieldCheck className="w-4 h-4 text-[#ff5200]" />
+                              Enter 6-digit OTP sent to +91 {mobile}
+                            </span>
+                            {devOtpHint && (
+                              <span
+                                onClick={() => setPhoneOtp(devOtpHint)}
+                                className="text-[10px] font-extrabold text-[#ff5200] bg-orange-100 hover:bg-orange-200 px-2 py-0.5 rounded cursor-pointer transition"
+                                title="Click to auto-fill development OTP"
+                              >
+                                Dev OTP: {devOtpHint}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              maxLength={6}
+                              value={phoneOtp}
+                              onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                              placeholder="123456"
+                              autoFocus
+                              className="flex-1 rounded-xl border border-stone-300 bg-white py-2 px-3 text-center text-sm font-black tracking-widest text-stone-900 outline-none focus:border-[#ff5200] focus:ring-2 focus:ring-[#ff5200]/20"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleVerifyPhoneOtp}
+                              disabled={verifyingOtp || phoneOtp.length !== 6}
+                              className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#ff4d2d] to-amber-500 text-white text-xs font-extrabold shadow hover:opacity-95 active:scale-95 disabled:opacity-40 cursor-pointer"
+                            >
+                              {verifyingOtp ? <ClipLoader size={14} color="#ffffff" /> : 'Verify'}
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
 
+                  {/* Password Field */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-xs font-bold text-stone-700">Password</label>
@@ -448,7 +619,7 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
-                        autoComplete="new-password"
+                        autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                         className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-2.5 pl-10 pr-10 text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
                         required
                       />
@@ -462,6 +633,7 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
                     </div>
                   </div>
 
+                  {/* Role Selector (Only on SignUp) */}
                   {mode === 'signup' && (
                     <div>
                       <label className="block text-xs font-bold text-stone-700 mb-1">Account Role</label>
@@ -491,7 +663,7 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
                   {/* Submit Button */}
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || (mode === 'signup' && !isPhoneVerified)}
                     className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#ff4d2d] to-amber-500 py-3 font-display text-sm font-bold text-white shadow-lg shadow-[#ff4d2d]/30 transition hover:opacity-95 active:scale-[0.98] disabled:opacity-60 cursor-pointer"
                   >
                     {loading ? (
