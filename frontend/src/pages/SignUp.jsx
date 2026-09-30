@@ -15,7 +15,6 @@ function SignUp() {
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState('user');
   const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mobile, setMobile] = useState('');
   const [err, setErr] = useState('');
@@ -120,10 +119,6 @@ function SignUp() {
       setErr('Please enter your full name.');
       return false;
     }
-    if (!email || !email.includes('@')) {
-      setErr('Please enter a valid email address.');
-      return false;
-    }
     const phoneRes = checkClientPhone(mobile);
     if (!phoneRes.valid) {
       setErr(phoneRes.msg);
@@ -150,7 +145,7 @@ function SignUp() {
       const phoneRes = checkClientPhone(mobile);
       const result = await axios.post(
         `${serverUrl}/api/auth/signup`,
-        { fullName, email, password, mobile: phoneRes.clean, role },
+        { fullName: fullName.trim(), password, mobile: phoneRes.clean, role },
         { withCredentials: true }
       );
       dispatch(setUserData(result.data));
@@ -470,22 +465,6 @@ function SignUp() {
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-stone-700 mb-1">Email Address</label>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-3 h-4 w-4 text-stone-400" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                autoComplete="off"
-                className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-2.5 pl-10 pr-4 text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
-                required
-              />
-            </div>
           </div>
 
           <div>

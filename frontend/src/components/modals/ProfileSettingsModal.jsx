@@ -12,6 +12,7 @@ const ProfileSettingsModal = ({ isOpen, onClose }) => {
 
   const [fullName, setFullName] = useState("");
   const [mobile, setMobile] = useState("");
+  const [email, setEmail] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -31,6 +32,7 @@ const ProfileSettingsModal = ({ isOpen, onClose }) => {
     if (userData) {
       setFullName(userData.fullName || "");
       setMobile(userData.mobile || "");
+      setEmail(userData.email || "");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -73,6 +75,7 @@ const ProfileSettingsModal = ({ isOpen, onClose }) => {
       const payload = {
         fullName: fullName.trim(),
         mobile: mobile.trim(),
+        email: email.trim(),
       };
 
       if (showPasswordChange && newPassword) {
@@ -162,18 +165,19 @@ const ProfileSettingsModal = ({ isOpen, onClose }) => {
             </div>
           </div>
 
-          {/* Email (Read only) */}
+          {/* Email Address (Added from Edit Profile) */}
           <div>
             <label className="block text-[10px] font-black text-stone-500 uppercase tracking-wider mb-1">
-              Email Address (Read-only)
+              Email Address (Optional)
             </label>
             <div className="relative flex items-center">
               <FaEnvelope className="absolute left-3.5 text-stone-400 text-xs" />
               <input
                 type="email"
-                value={userData?.email || ""}
-                disabled
-                className="w-full bg-stone-100 border border-stone-200 rounded-xl pl-9 pr-3 py-2.5 text-xs text-stone-500 font-semibold cursor-not-allowed"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@example.com"
+                className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-9 pr-3 py-2.5 text-xs text-stone-800 font-semibold focus:outline-none focus:border-[#ff5200] focus:bg-white transition"
               />
             </div>
           </div>

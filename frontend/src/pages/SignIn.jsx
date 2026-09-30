@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState('');
+  const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,11 +24,9 @@ function SignIn() {
   const dispatch = useDispatch();
 
   const validateForm = () => {
-    const trimmed = email.trim();
-    const isEmail = trimmed.includes('@');
-    const isPhone = /^\d{10}$/.test(trimmed.replace(/[\s+-]/g, ''));
-    if (!isEmail && !isPhone) {
-      setErr('Please enter a valid email address or 10-digit mobile number.');
+    const cleanMobile = mobile.replace(/\D/g, '');
+    if (!cleanMobile || cleanMobile.length !== 10) {
+      setErr('Please enter your valid 10-digit mobile number.');
       return false;
     }
     if (!password || password.length < 6) {
@@ -45,9 +43,10 @@ function SignIn() {
     setLoading(true);
     setErr('');
     try {
+      const cleanMobile = mobile.replace(/\D/g, '');
       const result = await axios.post(
         `${serverUrl}/api/auth/signin`,
-        { email: email.trim(), password },
+        { mobile: cleanMobile, password },
         { withCredentials: true }
       );
       dispatch(setUserData(result.data));
@@ -253,16 +252,17 @@ function SignIn() {
             {/* Form */}
             <form onSubmit={handleSignIn} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1">Email or 10-Digit Mobile</label>
-                <div className="relative">
-                  <Mail className="absolute left-3.5 top-3 h-4 w-4 text-stone-400" />
+                <label className="block text-xs font-bold text-stone-700 mb-1">Mobile Number</label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3.5 text-xs font-bold text-stone-400">+91</span>
                   <input
-                    type="text"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com or 9876543210"
-                    autoComplete="username"
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-2.5 pl-10 pr-4 text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
+                    type="tel"
+                    maxLength={10}
+                    value={mobile}
+                    onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    placeholder="9876543210"
+                    autoComplete="tel"
+                    className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-2.5 pl-12 pr-4 text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
                     required
                   />
                 </div>

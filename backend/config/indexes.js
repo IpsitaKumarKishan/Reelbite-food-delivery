@@ -19,7 +19,8 @@ export const ensureIndexes = async () => {
 
     await User.collection.createIndex({ location: "2dsphere" });
     await User.collection.createIndex({ role: 1, isOnline: 1 });
-    await User.collection.createIndex({ mobile: 1 }, { unique: true, sparse: true });
+    await User.collection.createIndex({ mobile: 1 }, { unique: true });
+    await User.collection.createIndex({ email: 1 }, { unique: true, sparse: true });
 
     await Reel.collection.createIndex({ likes: 1 });
     await Reel.collection.createIndex({ shop: 1, createdAt: -1 });

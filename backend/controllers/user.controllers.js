@@ -375,3 +375,80 @@ export const setDefaultAddress = async (req, res) => {
     return res.status(500).json({ message: `Set default address error ${error.message || error}` });
   }
 };
+
+/**
+ * PUT /api/user/profile
+ * Updates user profile details (fullName, email, mobile, password)
+ * Allows users to add or edit their email address from profile.
+ */
+export const updateProfile = async (req, res) => {
+  try {
+    const { fullName, email, mobile, currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    if (fullName && fullName.trim()) {
+      user.fullName = fullName.trim();
+    }
+
+    if (mobile && mobile.trim()) {
+      const cleanMobile = mobile.trim().replace(/\D/g, "");
+      if (cleanMobile.length !== 10) {
+        return res.status(400).json({ message: "Mobile number must be exactly 10 digits." });
+      }
+      const existingMobile = await User.findOne({ mobile: cleanMobile, _id: { $ne: req.userId } });
+      if (existingMobile) {
+        return res.status(400).json({ message: "Mobile number is already registered to another account." });
+      }
+      user.mobile = cleanMobile;
+    }
+
+    if (email !== undefined) {
+      const trimmedEmail = String(email || "").trim().toLowerCase();
+      if (trimmedEmail) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(trimmedEmail)) {
+          return res.status(400).json({ message: "Please enter a valid email address." });
+        }
+        const existingEmail = await User.findOne({ email: trimmedEmail, _id: { $ne: req.userId } });
+        if (existingEmail) {
+          return res.status(400).json({ message: "This email address is already in use by another account." });
+        }
+        user.email = trimmedEmail;
+      }
+    }
+
+    if (newPassword) {
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "New password must be at least 6 characters." });
+      }
+      if (user.password) {
+        if (!currentPassword) {
+          return res.status(400).json({ message: "Current password is required to set a new password." });
+        }
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+          return res.status(400).json({ message: "Incorrect current password." });
+        }
+      }
+      user.password = await bcrypt.hash(newPassword, 10);
+    }
+
+    await user.save();
+
+    const userObj = user.toObject();
+    delete userObj.password;
+    delete userObj.resetOtp;
+    delete userObj.otpExpires;
+
+    return res.status(200).json({
+      message: "Profile updated successfully.",
+      user: userObj,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: `updateProfile error: ${error.message || error}` });
+  }
+};
+

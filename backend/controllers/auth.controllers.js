@@ -167,18 +167,23 @@ export const signUp = async (req, res) => {
             return res.status(400).json({ message: "Please verify your mobile number with OTP before completing registration." });
         }
 
-        let user = await User.findOne({ email: email.toLowerCase() })
-        if (user) {
-            return res.status(400).json({ message: "User already exists with this email address." })
-        }
-
         // Prevent multiple accounts from sharing the same phone number
         const existingMobileUser = await User.findOne({ mobile: cleanMobile })
         if (existingMobileUser) {
             return res.status(400).json({ message: "Mobile number is already registered with another account." })
         }
 
-        if (password.length < 6) {
+        // Email is optional during signup (users can add from profile)
+        let cleanEmail = null
+        if (email && typeof email === "string" && email.trim()) {
+            cleanEmail = email.trim().toLowerCase()
+            const existingEmailUser = await User.findOne({ email: cleanEmail })
+            if (existingEmailUser) {
+                return res.status(400).json({ message: "User already exists with this email address." })
+            }
+        }
+
+        if (!password || password.length < 6) {
             return res.status(400).json({ message: "Password must be at least 6 characters." })
         }
 
@@ -186,13 +191,17 @@ export const signUp = async (req, res) => {
         const assignedRole = ALLOWED_PUBLIC_ROLES.includes(role) ? role : "user";
      
         const hashedPassword = await bcrypt.hash(password, 10)
-        user = await User.create({
-            fullName,
-            email: email.toLowerCase(),
+        const userPayload = {
+            fullName: fullName.trim(),
             role: assignedRole,
             mobile: cleanMobile,
             password: hashedPassword
-        })
+        }
+        if (cleanEmail) {
+            userPayload.email = cleanEmail
+        }
+
+        const user = await User.create(userPayload)
 
         // Clean up OTP record once successfully registered
         await PhoneOtp.deleteMany({ mobile: cleanMobile });
@@ -207,34 +216,50 @@ export const signUp = async (req, res) => {
     }
 }
 
-export const signIn=async (req,res) => {
+export const signIn = async (req, res) => {
     try {
-        const {email,password}=req.body
-        if (!email) {
-            return res.status(400).json({ message: "Email or mobile number is required." })
+        const { email, mobile, password } = req.body
+        const rawIdentifier = mobile || email || req.body.identifier
+        if (!rawIdentifier) {
+            return res.status(400).json({ message: "Mobile number is required to sign in." })
         }
 
-        const identifier = String(email).trim()
-        const isNumericPhone = /^\d{10}$/.test(identifier.replace(/[\s+-]/g, ''))
-        const query = isNumericPhone
-            ? { mobile: identifier.replace(/\D/g, '') }
-            : { email: identifier.toLowerCase() }
+        const identifier = String(rawIdentifier).trim()
+        const phoneValidation = validatePhoneNumber(identifier)
+        let query = null
 
-        const user=await User.findOne(query)
-        if(!user){
-            return res.status(400).json({message:"User does not exist."})
+        if (phoneValidation.isValid) {
+            query = { mobile: phoneValidation.normalizedMobile }
+        } else if (identifier.includes("@")) {
+            query = { email: identifier.toLowerCase() }
+        } else {
+            const digitsOnly = identifier.replace(/\D/g, '')
+            if (digitsOnly.length === 10) {
+                query = { mobile: digitsOnly }
+            } else {
+                return res.status(400).json({ message: "Please enter a valid 10-digit mobile number." })
+            }
+        }
+
+        const user = await User.findOne(query)
+        if (!user) {
+            return res.status(400).json({ message: "User not found with this mobile number." })
         }
 
         if (user.status === "suspended") {
             return res.status(403).json({ message: "Your account has been suspended by the platform administrator." });
         }
         
-     const isMatch=await bcrypt.compare(password,user.password)
-     if(!isMatch){
-         return res.status(400).json({message:"incorrect Password"})
-     }
+        if (!user.password) {
+            return res.status(400).json({ message: "Account does not have a password set. Please log in using Google or reset password." })
+        }
 
-        const token=await genToken(user._id)
+        const isMatch = await bcrypt.compare(password, user.password)
+        if (!isMatch) {
+            return res.status(400).json({ message: "Incorrect password." })
+        }
+
+        const token = await genToken(user._id)
         res.cookie("token", token, COOKIE_OPTIONS)
   
         return res.status(200).json(sanitizeUser(user))
@@ -244,67 +269,93 @@ export const signIn=async (req,res) => {
     }
 }
 
-export const signOut=async (req,res) => {
+export const signOut = async (req, res) => {
     try {
         res.clearCookie("token", {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
         })
-        return res.status(200).json({message:"log out successfully"})
+        return res.status(200).json({ message: "log out successfully" })
     } catch (error) {
         return res.status(500).json(`sign out error ${error}`)
     }
 }
 
-export const sendOtp=async (req,res) => {
+export const sendOtp = async (req, res) => {
   try {
-    const {email}=req.body
-    const user=await User.findOne({email})
-    if(!user){
-       return res.status(400).json({message:"User does not exist."})
+    const { email, mobile } = req.body
+    const rawTarget = mobile || email
+    if (!rawTarget) {
+      return res.status(400).json({ message: "Mobile number or email is required." })
     }
-    const otp=Math.floor(1000 + Math.random() * 9000).toString()
-    user.resetOtp=otp
-    user.otpExpires=Date.now()+5*60*1000
-    user.isOtpVerified=false
+
+    const clean = String(rawTarget).trim()
+    const isEmail = clean.includes("@")
+    const query = isEmail ? { email: clean.toLowerCase() } : { mobile: clean.replace(/\D/g, '') }
+
+    const user = await User.findOne(query)
+    if (!user) {
+       return res.status(400).json({ message: "User does not exist." })
+    }
+
+    const otp = Math.floor(1000 + Math.random() * 9000).toString()
+    user.resetOtp = otp
+    user.otpExpires = Date.now() + 5 * 60 * 1000
+    user.isOtpVerified = false
     await user.save()
-    await sendOtpMail(email,otp)
-    return res.status(200).json({message:"otp sent successfully"})
+
+    if (user.email && isEmail) {
+        await sendOtpMail(user.email, otp)
+    } else if (user.mobile) {
+        await sendPhoneOtpSms(user.mobile, otp)
+    }
+
+    return res.status(200).json({ message: "OTP sent successfully." })
   } catch (error) {
      return res.status(500).json(`send otp error ${error}`)
   }  
 }
 
-export const verifyOtp=async (req,res) => {
+export const verifyOtp = async (req, res) => {
     try {
-        const {email,otp}=req.body
-        const user=await User.findOne({email})
-        if(!user || user.resetOtp!=otp || user.otpExpires<Date.now()){
-            return res.status(400).json({message:"invalid/expired otp"})
+        const { email, mobile, otp } = req.body
+        const rawTarget = mobile || email
+        const clean = String(rawTarget || '').trim()
+        const isEmail = clean.includes("@")
+        const query = isEmail ? { email: clean.toLowerCase() } : { mobile: clean.replace(/\D/g, '') }
+
+        const user = await User.findOne(query)
+        if (!user || user.resetOtp != otp || user.otpExpires < Date.now()) {
+            return res.status(400).json({ message: "Invalid or expired OTP." })
         }
-        user.isOtpVerified=true
-        user.resetOtp=undefined
-        user.otpExpires=undefined
+        user.isOtpVerified = true
+        user.resetOtp = undefined
+        user.otpExpires = undefined
         await user.save()
-        return res.status(200).json({message:"otp verify successfully"})
+        return res.status(200).json({ message: "OTP verified successfully." })
     } catch (error) {
          return res.status(500).json(`verify otp error ${error}`)
     }
 }
 
-export const resetPassword=async (req,res) => {
+export const resetPassword = async (req, res) => {
     try {
-        const {email,newPassword}=req.body
-        const user=await User.findOne({email})
-    if(!user || !user.isOtpVerified){
-       return res.status(400).json({message:"otp verification required"})
-    }
-    const hashedPassword=await bcrypt.hash(newPassword,10)
-    user.password=hashedPassword
-    user.isOtpVerified=false
-    await user.save()
-     return res.status(200).json({message:"password reset successfully"})
+        const { email, mobile, newPassword } = req.body
+        const rawTarget = mobile || email
+        const clean = String(rawTarget || '').trim()
+        const isEmail = clean.includes("@")
+        const query = isEmail ? { email: clean.toLowerCase() } : { mobile: clean.replace(/\D/g, '') }
+
+        const user = await User.findOne(query)
+        if (!user || !user.isOtpVerified) {
+           return res.status(400).json({ message: "OTP verification required." })
+        }
+        const hashedPassword = await bcrypt.hash(newPassword, 10)
+        user.password = hashedPassword
+        user.isOtpVerified = false
+        await user.save()
+        return res.status(200).json({ message: "Password reset successfully." })
     } catch (error) {
          return res.status(500).json(`reset password error ${error}`)
     }
