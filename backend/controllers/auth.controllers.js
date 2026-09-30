@@ -68,34 +68,10 @@ export const sendPhoneOtp = async (req, res) => {
             provider: smsResult?.provider || "local"
         });
 
-        const isTwilioDelivered = smsResult?.provider === "twilio_verify" || smsResult?.provider === "twilio";
-        const isTrialBlocked = Boolean(
-            smsResult?.twilioError &&
-            (smsResult.twilioError.includes("verified tester") ||
-             smsResult.twilioError.includes("verified recipient") ||
-             smsResult.twilioError.includes("trial"))
-        );
-
-        const responseData = {
-            message: isTwilioDelivered
-                ? `Live SMS OTP sent successfully to +91 ${cleanMobile}`
-                : `OTP generated for +91 ${cleanMobile}`,
+        return res.status(200).json({
+            message: `OTP sent successfully to +91 ${cleanMobile}`,
             mobile: cleanMobile,
-            provider: smsResult?.provider || "local",
-            isTwilioDelivered,
-        };
-
-        if (isTrialBlocked) {
-            responseData.trialNotice = "Twilio Trial Restriction: Real SMS is only delivered to numbers verified in your Twilio Console (under Verified Caller IDs). Dev OTP is provided below for immediate testing.";
-            responseData.twilioError = smsResult.twilioError;
-        }
-
-        // Return devOtp whenever in dev mode or whenever Twilio delivery was restricted
-        if (process.env.NODE_ENV !== "production" || !isTwilioDelivered) {
-            responseData.devOtp = otp;
-        }
-
-        return res.status(200).json(responseData);
+        });
     } catch (error) {
         return res.status(500).json({ message: `sendPhoneOtp error: ${error.message || error}` });
     }
@@ -142,11 +118,9 @@ export const verifyPhoneOtp = async (req, res) => {
             }
         }
 
-        // Accept local OTP if provider is local or in dev/test mode
-        if (!isVerified && (phoneOtp.provider !== "twilio_verify" || process.env.NODE_ENV !== "production")) {
-            if (phoneOtp.otp === String(otp).trim()) {
-                isVerified = true;
-            }
+        // Verify against generated OTP record
+        if (!isVerified && phoneOtp.otp === String(otp).trim()) {
+            isVerified = true;
         }
 
         if (!isVerified) {
