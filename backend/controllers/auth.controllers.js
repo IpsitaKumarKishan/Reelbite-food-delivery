@@ -2,6 +2,7 @@ import User from "../models/user.model.js"
 import bcrypt from "bcryptjs"
 import genToken from "../utils/token.js"
 import { sendOtpMail } from "../utils/mail.js"
+import { validatePhoneNumber } from "../utils/phoneValidator.js"
 
 const COOKIE_OPTIONS = {
     secure: process.env.NODE_ENV === "production",
@@ -20,40 +21,51 @@ const sanitizeUser = (user) => {
 
 const ALLOWED_PUBLIC_ROLES = ["user", "owner", "deliveryBoy"];
 
-export const signUp=async (req,res) => {
+export const signUp = async (req, res) => {
     try {
-        const {fullName,email,password,mobile,role}=req.body
-        const cleanMobile = mobile ? String(mobile).replace(/\D/g, '') : ""
-        if (!cleanMobile || cleanMobile.length < 10 || cleanMobile === "0000000000") {
-            return res.status(400).json({ message: "A valid 10-digit mobile number is required." })
+        const { fullName, email, password, mobile, role } = req.body
+
+        // Validation Layer: Phone Number Integrity
+        const phoneValidation = validatePhoneNumber(mobile)
+        if (!phoneValidation.isValid) {
+            return res.status(400).json({ message: phoneValidation.message })
         }
-        let user=await User.findOne({email})
-        if(user){
-            return res.status(400).json({message:"User Already exist."})
+        const cleanMobile = phoneValidation.normalizedMobile
+
+        let user = await User.findOne({ email: email.toLowerCase() })
+        if (user) {
+            return res.status(400).json({ message: "User already exists with this email address." })
         }
-        if(password.length<6){
-            return res.status(400).json({message:"password must be at least 6 characters."})
+
+        // Prevent multiple accounts from sharing the same phone number
+        const existingMobileUser = await User.findOne({ mobile: cleanMobile })
+        if (existingMobileUser) {
+            return res.status(400).json({ message: "Mobile number is already registered with another account." })
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({ message: "Password must be at least 6 characters." })
         }
 
         // Security: Whitelist allowed registration roles. Administrative roles can never be self-assigned.
         const assignedRole = ALLOWED_PUBLIC_ROLES.includes(role) ? role : "user";
      
-        const hashedPassword=await bcrypt.hash(password,10)
-        user=await User.create({
+        const hashedPassword = await bcrypt.hash(password, 10)
+        user = await User.create({
             fullName,
-            email,
+            email: email.toLowerCase(),
             role: assignedRole,
             mobile: cleanMobile,
-            password:hashedPassword
+            password: hashedPassword
         })
 
-        const token=await genToken(user._id)
+        const token = await genToken(user._id)
         res.cookie("token", token, COOKIE_OPTIONS)
   
         return res.status(201).json(sanitizeUser(user))
 
     } catch (error) {
-        return res.status(500).json(`sign up error ${error}`)
+        return res.status(500).json({ message: `sign up error ${error.message || error}` })
     }
 }
 
@@ -172,15 +184,16 @@ export const googleAuth = async (req, res) => {
             return res.status(403).json({ message: "Your account has been suspended by the platform administrator." });
         }
 
-        const cleanMobile = mobile ? String(mobile).replace(/\D/g, '') : ''
-        const hasValidMobileInput = cleanMobile.length >= 10 && cleanMobile !== "0000000000"
-
         // If user already exists and already has a valid phone number, log them in immediately
-        if (user && user.mobile && user.mobile.length >= 10 && user.mobile !== "0000000000") {
+        if (user && user.mobile && validatePhoneNumber(user.mobile).isValid) {
             const token = await genToken(user._id)
             res.cookie("token", token, COOKIE_OPTIONS)
             return res.status(200).json(sanitizeUser(user))
         }
+
+        const phoneValidation = validatePhoneNumber(mobile)
+        const hasValidMobileInput = phoneValidation.isValid
+        const cleanMobile = phoneValidation.normalizedMobile
 
         // If new user or existing user missing phone number, and no valid phone number was supplied:
         const assignedRole = ALLOWED_PUBLIC_ROLES.includes(role) ? role : (user?.role || "user");
@@ -190,8 +203,17 @@ export const googleAuth = async (req, res) => {
                 email: email.toLowerCase(),
                 fullName: user?.fullName || fullName || (email ? email.split("@")[0] : "User"),
                 role: user?.role || assignedRole,
-                message: "Please provide a valid 10-digit phone number to complete login."
+                message: phoneValidation.message || "Please provide a valid 10-digit phone number to complete login."
             })
+        }
+
+        // Prevent mobile number collision with another user account
+        const existingMobileUser = await User.findOne({
+            mobile: cleanMobile,
+            _id: { $ne: user?._id }
+        })
+        if (existingMobileUser) {
+            return res.status(400).json({ message: "Mobile number is already registered with another account." })
         }
 
         if (!user) {
@@ -212,6 +234,6 @@ export const googleAuth = async (req, res) => {
         return res.status(200).json(sanitizeUser(user))
 
     } catch (error) {
-        return res.status(500).json(`googleAuth error ${error}`)
+        return res.status(500).json({ message: `googleAuth error ${error.message || error}` })
     }
 }

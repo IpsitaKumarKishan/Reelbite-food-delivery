@@ -26,6 +26,22 @@ function SignUp() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
+  const checkClientPhone = (raw) => {
+    let clean = String(raw || '').trim().replace(/[\s\-\(\)\.]/g, '');
+    if (clean.startsWith('+91')) clean = clean.slice(3);
+    else if (clean.startsWith('0091')) clean = clean.slice(4);
+    else if (clean.length === 12 && clean.startsWith('91') && /^[6-9]/.test(clean.slice(2))) clean = clean.slice(2);
+    else if (clean.length === 11 && clean.startsWith('0') && /^[6-9]/.test(clean.slice(1))) clean = clean.slice(1);
+    clean = clean.replace(/\D/g, '');
+
+    if (!clean) return { valid: false, msg: 'Mobile phone number is required.' };
+    if (clean.length !== 10) return { valid: false, msg: `Mobile number must be exactly 10 digits (entered ${clean.length}).` };
+    if (!/^[6-9]/.test(clean)) return { valid: false, msg: 'Mobile number must start with 6, 7, 8, or 9.' };
+    if (/^(\d)\1{9}$/.test(clean)) return { valid: false, msg: 'Invalid mobile number: repetitive digits not allowed.' };
+    if (['1234567890', '0123456789', '9876543210'].includes(clean)) return { valid: false, msg: 'Invalid mobile number: sequential dummy numbers not allowed.' };
+    return { valid: true, clean };
+  };
+
   const validateForm = () => {
     if (!fullName.trim()) {
       setErr('Please enter your full name.');
@@ -35,9 +51,9 @@ function SignUp() {
       setErr('Please enter a valid email address.');
       return false;
     }
-    const cleanMobile = mobile.replace(/\D/g, '');
-    if (!cleanMobile || cleanMobile.length !== 10 || cleanMobile === '0000000000') {
-      setErr('A valid 10-digit mobile number is mandatory.');
+    const phoneRes = checkClientPhone(mobile);
+    if (!phoneRes.valid) {
+      setErr(phoneRes.msg);
       return false;
     }
     if (!password || password.length < 6) {
@@ -54,10 +70,10 @@ function SignUp() {
     setLoading(true);
     setErr('');
     try {
-      const cleanMobile = mobile.replace(/\D/g, '');
+      const phoneRes = checkClientPhone(mobile);
       const result = await axios.post(
         `${serverUrl}/api/auth/signup`,
-        { fullName, email, password, mobile: cleanMobile, role },
+        { fullName, email, password, mobile: phoneRes.clean, role },
         { withCredentials: true }
       );
       dispatch(setUserData(result.data));
@@ -79,14 +95,14 @@ function SignUp() {
         prompt: 'select_account'
       });
       const result = await signInWithPopup(auth, provider);
-      const cleanMobile = mobile ? mobile.replace(/\D/g, '') : (result.user.phoneNumber || '');
+      const phoneRes = checkClientPhone(mobile || result.user.phoneNumber || '');
       const { data } = await axios.post(
         `${serverUrl}/api/auth/google-auth`,
         {
           fullName: result.user.displayName || fullName || result.user.email?.split('@')[0] || 'User',
           email: result.user.email,
           role: role || 'user',
-          mobile: cleanMobile,
+          mobile: phoneRes.valid ? phoneRes.clean : '',
         },
         { withCredentials: true }
       );
@@ -109,9 +125,9 @@ function SignUp() {
 
   const handleCompleteGoogleAuth = async (e) => {
     e?.preventDefault();
-    const clean = pendingMobile.replace(/\D/g, '');
-    if (!clean || clean.length !== 10 || clean === '0000000000') {
-      setErr('Please enter a valid 10-digit mobile number.');
+    const phoneRes = checkClientPhone(pendingMobile);
+    if (!phoneRes.valid) {
+      setErr(phoneRes.msg);
       return;
     }
     setLoading(true);
@@ -122,7 +138,7 @@ function SignUp() {
         {
           fullName: googlePending.fullName,
           email: googlePending.email,
-          mobile: clean,
+          mobile: phoneRes.clean,
           role: googlePending.role || 'user',
         },
         { withCredentials: true }
@@ -270,14 +286,15 @@ function SignUp() {
           <div>
             <label className="block text-xs font-bold text-stone-700 mb-1">Mobile Number</label>
             <div className="relative">
-              <Phone className="absolute left-3.5 top-3 h-4 w-4 text-stone-400" />
+              <span className="absolute left-3.5 top-2.5 text-xs font-bold text-stone-400">+91</span>
               <input
                 type="tel"
+                maxLength={10}
                 value={mobile}
-                onChange={(e) => setMobile(e.target.value)}
+                onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
                 placeholder="9876543210"
-                autoComplete="off"
-                className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-2.5 pl-10 pr-4 text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
+                autoComplete="tel"
+                className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-2.5 pl-12 pr-4 text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
                 required
               />
             </div>

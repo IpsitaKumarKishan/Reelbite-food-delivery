@@ -3,6 +3,8 @@ import { body } from "express-validator"
 import validate from "../middlewares/validate.js"
 import { googleAuth, resetPassword, sendOtp, signIn, signOut, signUp, verifyOtp } from "../controllers/auth.controllers.js"
 
+import { validatePhoneNumber } from "../utils/phoneValidator.js"
+
 const authRouter = express.Router()
 
 authRouter.post(
@@ -10,7 +12,17 @@ authRouter.post(
   body("email").trim().isEmail().withMessage("Please enter a valid email address"),
   body("password").isLength({ min: 6 }).withMessage("Password must be at least 6 characters"),
   body("fullName").trim().notEmpty().withMessage("Full name is required"),
-  body("mobile").trim().isLength({ min: 10 }).withMessage("Mobile number must be at least 10 digits"),
+  body("mobile")
+    .trim()
+    .notEmpty()
+    .withMessage("Mobile phone number is required")
+    .custom((value) => {
+      const result = validatePhoneNumber(value);
+      if (!result.isValid) {
+        throw new Error(result.message);
+      }
+      return true;
+    }),
   body("role").isIn(["user", "owner", "deliveryBoy"]).withMessage("Invalid role specified"),
   validate,
   signUp
