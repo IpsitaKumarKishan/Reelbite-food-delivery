@@ -39,8 +39,11 @@ export const computeOrderSplit = (orderData, shopCommissionRates = {}) => {
 
   const deliveryFee = totalSubtotal > 500 ? 0 : 40;
   const platformFee = Number(orderData.platformFee) || 0;
-  const deliveryPartnerPayout = deliveryFee;
-  const platformRevenue = Math.round((totalCommissionAmount + platformFee) * 100) / 100;
+  // Guaranteed base driver payout floor (₹40). When customer gets free delivery, platform subsidizes the difference.
+  const baseDriverPayout = 40;
+  const deliveryPartnerPayout = Math.max(deliveryFee, baseDriverPayout);
+  const driverSubsidy = Math.max(0, deliveryPartnerPayout - deliveryFee);
+  const platformRevenue = Math.round((totalCommissionAmount + platformFee - driverSubsidy) * 100) / 100;
 
   return {
     subtotal: totalSubtotal,

@@ -92,7 +92,8 @@ export const settleOwnerOrders = async (req, res) => {
     for (const order of orders) {
       let orderModified = false;
       order.shopOrders.forEach((so) => {
-        if (so.owner && so.owner.toString() === ownerId.toString() && so.settlementStatus !== "settled") {
+        // Security & Financial Integrity: Only delivered orders can be settled
+        if (so.owner && so.owner.toString() === ownerId.toString() && so.settlementStatus !== "settled" && so.status === "delivered") {
           const subtotal = Number(so.subtotal) || 0;
           const rate = Number(so.commissionRate) || 20;
           const commissionAmount = Number(so.commissionAmount) || Math.round(subtotal * (rate / 100) * 100) / 100;

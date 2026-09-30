@@ -3,27 +3,44 @@ import uploadOnCloudinary from "../utils/cloudinary.js";
 
 export const createEditShop=async (req,res) => {
     try {
-       const {name,city,state,address}=req.body
-       let image;
-       if(req.file){
-        console.log(req.file)
-        image=await uploadOnCloudinary(req.file.path)
-       } 
-       let shop=await Shop.findOne({owner:req.userId})
-       if(!shop){
-        shop=await Shop.create({
-        name,city,state,address,image,owner:req.userId
-       })
-       }else{
-         shop=await Shop.findByIdAndUpdate(shop._id,{
-        name,city,state,address,image,owner:req.userId
-       },{new:true})
-       }
+        const { name, city, state, address, latitude, longitude, lat, lon } = req.body
+        const validLat = Number(latitude ?? lat);
+        const validLon = Number(longitude ?? lon);
+        const hasCoords = !isNaN(validLat) && !isNaN(validLon) && (validLat !== 0 || validLon !== 0);
+
+        let uploadedImage;
+        if(req.file){
+            uploadedImage = await uploadOnCloudinary(req.file.path)
+        } 
+        let shop = await Shop.findOne({owner:req.userId})
+        if(!shop){
+            const newShopData = {
+                name,
+                city,
+                state,
+                address,
+                image: uploadedImage || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=600&auto=format&fit=crop&q=80",
+                owner: req.userId
+            }
+            if (hasCoords) {
+                newShopData.location = { type: 'Point', coordinates: [validLon, validLat] }
+            }
+            shop = await Shop.create(newShopData)
+        } else {
+            const updatePayload = { name, city, state, address, owner: req.userId }
+            if (uploadedImage) {
+                updatePayload.image = uploadedImage
+            }
+            if (hasCoords) {
+                updatePayload.location = { type: 'Point', coordinates: [validLon, validLat] }
+            }
+            shop = await Shop.findByIdAndUpdate(shop._id, updatePayload, { new: true })
+        }
       
-       await shop.populate("owner items")
-       return res.status(201).json(shop)
+        await shop.populate("owner items")
+        return res.status(201).json(shop)
     } catch (error) {
-        return res.status(500).json({message:`create shop error ${error}`})
+        return res.status(500).json({ message: `create shop error ${error.message || error}` })
     }
 }
 

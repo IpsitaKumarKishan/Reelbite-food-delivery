@@ -14,7 +14,19 @@ export const socketHandler = (io) => {
     })
 
 
-    socket.on('updateLocation', async ({ latitude, longitude, userId }) => {
+    socket.on('joinOrder', ({ orderId }) => {
+      if (orderId) {
+        socket.join(`order_${orderId}`);
+      }
+    });
+
+    socket.on('leaveOrder', ({ orderId }) => {
+      if (orderId) {
+        socket.leave(`order_${orderId}`);
+      }
+    });
+
+    socket.on('updateLocation', async ({ latitude, longitude, userId, orderId }) => {
       try {
         const user = await User.findByIdAndUpdate(userId, {
           location: {
@@ -26,16 +38,20 @@ export const socketHandler = (io) => {
         })
 
         if (user) {
-          io.emit('updateDeliveryLocation',{
-            deliveryBoyId:userId,
+          const payload = {
+            deliveryBoyId: userId,
             latitude,
-            longitude
-          })
+            longitude,
+            orderId
+          };
+          if (orderId) {
+            io.to(`order_${orderId}`).emit('updateDeliveryLocation', payload);
+          } else {
+            io.emit('updateDeliveryLocation', payload);
+          }
         }
-
-
       } catch (error) {
-          console.log('updateDeliveryLocation error')
+          console.log('updateDeliveryLocation error', error)
       }
     })
 

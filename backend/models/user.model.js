@@ -79,8 +79,8 @@ coordinates:{type:[Number],default:[0,0]}
   
 }, { timestamps: true })
 
-userSchema.index({location:'2dsphere'})
-
+userSchema.index({ location: '2dsphere' })
+userSchema.index({ role: 1, isOnline: 1 })
 
 const User=mongoose.model("User",userSchema)
 export default User

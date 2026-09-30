@@ -18,6 +18,8 @@ const sanitizeUser = (user) => {
     return userObj;
 };
 
+const ALLOWED_PUBLIC_ROLES = ["user", "owner", "deliveryBoy"];
+
 export const signUp=async (req,res) => {
     try {
         const {fullName,email,password,mobile,role}=req.body
@@ -32,12 +34,15 @@ export const signUp=async (req,res) => {
         if(password.length<6){
             return res.status(400).json({message:"password must be at least 6 characters."})
         }
+
+        // Security: Whitelist allowed registration roles. Administrative roles can never be self-assigned.
+        const assignedRole = ALLOWED_PUBLIC_ROLES.includes(role) ? role : "user";
      
         const hashedPassword=await bcrypt.hash(password,10)
         user=await User.create({
             fullName,
             email,
-            role,
+            role: assignedRole,
             mobile: cleanMobile,
             password:hashedPassword
         })
@@ -178,12 +183,13 @@ export const googleAuth = async (req, res) => {
         }
 
         // If new user or existing user missing phone number, and no valid phone number was supplied:
+        const assignedRole = ALLOWED_PUBLIC_ROLES.includes(role) ? role : (user?.role || "user");
         if (!hasValidMobileInput) {
             return res.status(200).json({
                 needsMobile: true,
                 email: email.toLowerCase(),
                 fullName: user?.fullName || fullName || (email ? email.split("@")[0] : "User"),
-                role: user?.role || role || "user",
+                role: user?.role || assignedRole,
                 message: "Please provide a valid 10-digit phone number to complete login."
             })
         }
@@ -193,7 +199,7 @@ export const googleAuth = async (req, res) => {
                 fullName: fullName || (email ? email.split("@")[0] : "User"),
                 email: email.toLowerCase(),
                 mobile: cleanMobile,
-                role: role || "user"
+                role: assignedRole
             })
         } else {
             user.mobile = cleanMobile

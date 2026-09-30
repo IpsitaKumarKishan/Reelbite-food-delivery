@@ -31,7 +31,8 @@ export default function NotificationDropdown({ onClose }) {
         <div className="flex items-center gap-2">
           <span className="font-black text-sm text-stone-900">Notifications</span>
           {unreadCount > 0 && (
-            <span className="bg-[#ff5200] text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full">
+            <span className="bg-[#ff5200] text-white text-
+            [10px] font-extrabold px-1.5 py-0.5 rounded-full">
               {unreadCount} new
             </span>
           )}

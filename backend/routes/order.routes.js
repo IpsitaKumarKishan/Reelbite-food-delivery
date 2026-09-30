@@ -2,7 +2,7 @@ import express from "express"
 import { body } from "express-validator"
 import validate from "../middlewares/validate.js"
 import isAuth from "../middlewares/isAuth.js"
-import { acceptOrder, cancelOrder, getCurrentOrder, getDeliveryBoyAssignment, getMyOrders, getOrderById, getTodayDeliveries, placeOrder, rejectShopOrder, sendDeliveryOtp, updateOrderStatus, verifyDeliveryOtp, verifyPayment } from "../controllers/order.controllers.js"
+import { acceptOrder, cancelOrder, getCurrentOrder, getDeliveryBoyAssignment, getMyOrders, getOrderById, getTodayDeliveries, placeOrder, rejectShopOrder, riderCancelOrder, sendDeliveryOtp, updateOrderStatus, verifyDeliveryOtp, verifyPayment } from "../controllers/order.controllers.js"
 
 const orderRouter=express.Router()
 
@@ -53,5 +53,21 @@ orderRouter.get('/get-order-by-id/:orderId',isAuth,getOrderById)
 orderRouter.get('/get-today-deliveries',isAuth,getTodayDeliveries)
 orderRouter.post('/cancel/:orderId', isAuth, cancelOrder)
 orderRouter.post('/reject/:orderId/:shopId', isAuth, rejectShopOrder)
+orderRouter.post(
+  "/rider-cancel",
+  isAuth,
+  body("orderId").notEmpty().withMessage("Order ID is required"),
+  body("shopOrderId").notEmpty().withMessage("Shop Order ID is required"),
+  body("reason").trim().isLength({ min: 3 }).withMessage("A valid cancellation reason is required"),
+  validate,
+  riderCancelOrder
+)
+orderRouter.post(
+  "/rider-cancel/:orderId/:shopOrderId",
+  isAuth,
+  body("reason").trim().isLength({ min: 3 }).withMessage("A valid cancellation reason is required"),
+  validate,
+  riderCancelOrder
+)
 
 export default orderRouter

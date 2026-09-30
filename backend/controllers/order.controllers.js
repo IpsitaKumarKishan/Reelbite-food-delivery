@@ -2,6 +2,7 @@ import DeliveryAssignment from "../models/deliveryAssignment.model.js"
 import Order from "../models/order.model.js"
 import Shop from "../models/shop.model.js"
 import User from "../models/user.model.js"
+import Item from "../models/item.model.js"
 import Coupon from "../models/coupon.model.js"
 import { sendDeliveryOtpMail } from "../utils/mail.js"
 import RazorPay from "razorpay"
@@ -43,15 +44,53 @@ export const placeOrder = async (req, res) => {
             await user.save()
         }
 
-        const groupItemsByShop = {}
+        // Security: Verify dish prices against database (Anti-price-tampering)
+        const itemIds = cartItems.map(i => i.id || i._id).filter(Boolean);
+        if (itemIds.length !== cartItems.length) {
+            return res.status(400).json({ message: "Invalid item reference in cart" });
+        }
 
-        cartItems.forEach(item => {
-            const shopId = item.shop
-            if (!groupItemsByShop[shopId]) {
-                groupItemsByShop[shopId] = []
+        const dbItems = await Item.find({ _id: { $in: itemIds } }).populate("shop");
+        if (dbItems.length !== itemIds.length) {
+            return res.status(400).json({ message: "One or more dishes in your cart are no longer available" });
+        }
+
+        const dbItemMap = new Map();
+        dbItems.forEach(item => dbItemMap.set(item._id.toString(), item));
+
+        const groupItemsByShop = {};
+
+        for (const item of cartItems) {
+            const rawId = String(item.id || item._id || "");
+            const dbItem = dbItemMap.get(rawId);
+            if (!dbItem) {
+                return res.status(400).json({ message: `Item ${item.name || rawId} not found` });
             }
-            groupItemsByShop[shopId].push(item)
-        });
+            const verifiedPrice = Number(dbItem.price);
+            const verifiedQty = Math.max(1, Number(item.quantity) || 1);
+            const shopId = (dbItem.shop?._id || dbItem.shop).toString();
+
+            if (!groupItemsByShop[shopId]) {
+                groupItemsByShop[shopId] = [];
+            }
+
+            groupItemsByShop[shopId].push({
+                id: dbItem._id,
+                _id: dbItem._id,
+                name: dbItem.name,
+                price: verifiedPrice,
+                quantity: verifiedQty,
+                image: dbItem.image,
+                shop: shopId
+            });
+        }
+
+        // Business rule: Enforce single-restaurant orders to ensure clear delivery routing and accurate driver payout
+        if (Object.keys(groupItemsByShop).length > 1) {
+            return res.status(400).json({
+                message: "Items in your cart belong to multiple restaurants. Orders can only be placed from one restaurant at a time."
+            });
+        }
 
         const shopCommissionRates = {}
         const shopOrders = await Promise.all(Object.keys(groupItemsByShop).map(async (shopId) => {
@@ -61,7 +100,7 @@ export const placeOrder = async (req, res) => {
             }
             shopCommissionRates[shop._id.toString()] = shop.commissionRate || 20;
             const items = groupItemsByShop[shopId]
-            const subtotal = items.reduce((sum, i) => sum + Number(i.price) * Number(i.quantity), 0)
+            const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0)
             const rate = shop.commissionRate || 20;
             const commissionAmount = Math.round((subtotal * (rate / 100)) * 100) / 100;
             const restaurantPayout = Math.round((subtotal - commissionAmount) * 100) / 100;
@@ -139,10 +178,7 @@ export const placeOrder = async (req, res) => {
                 payment: false
             })
 
-            if (matchedCoupon) {
-                matchedCoupon.usedBy.push({ user: req.userId, order: newOrder._id });
-                await matchedCoupon.save();
-            }
+            // Note: For online payments, coupon is marked as used only after payment is verified in verifyPayment
 
             return res.status(200).json({
                 razorOrder,
@@ -235,6 +271,14 @@ export const verifyPayment = async (req, res) => {
 
         await order.save()
         await User.findByIdAndUpdate(req.userId, { cart: [] });
+
+        // Phase 2.3: Record coupon usage atomically now that payment is confirmed captured
+        if (order.coupon?.code) {
+            await Coupon.updateOne(
+                { code: order.coupon.code.trim().toUpperCase() },
+                { $push: { usedBy: { user: req.userId, order: order._id } } }
+            );
+        }
 
         await order.populate("shopOrders.shopOrderItems.item", "name image price")
         await order.populate("shopOrders.shop", "name")
@@ -350,21 +394,42 @@ export const updateOrderStatus = async (req, res) => {
         const { orderId, shopId } = req.params
         const { status } = req.body
         const order = await Order.findById(orderId)
+        if (!order) {
+            return res.status(404).json({ message: "Order not found" })
+        }
 
-        const shopOrder = order.shopOrders.find(o => o.shop == shopId)
+        const shop = await Shop.findById(shopId)
+        if (!shop) {
+            return res.status(404).json({ message: "Shop not found" })
+        }
+
+        // Security check: Only the owner of this shop or an admin can update order status
+        if (shop.owner.toString() !== req.userId.toString() && req.userRole !== "admin") {
+            return res.status(403).json({ message: "Unauthorized: You can only update orders for your own restaurant." })
+        }
+
+        const shopOrder = order.shopOrders.find(o => String(o.shop) === String(shopId))
         if (!shopOrder) {
-            return res.status(400).json({ message: "shop order not found" })
+            return res.status(400).json({ message: "Shop order not found in this order" })
         }
         shopOrder.status = status
         let deliveryBoysPayload = []
         if (status == "out of delivery" && !shopOrder.assignment) {
-            const { longitude, latitude } = order.deliveryAddress
+            // Phase 3.2: Target search near restaurant pickup location first, fallback to deliveryAddress
+            let searchCoords = null;
+            if (shop.location?.coordinates && shop.location.coordinates.length === 2 && (shop.location.coordinates[0] !== 0 || shop.location.coordinates[1] !== 0)) {
+                searchCoords = [Number(shop.location.coordinates[0]), Number(shop.location.coordinates[1])];
+            } else {
+                searchCoords = [Number(order.deliveryAddress.longitude), Number(order.deliveryAddress.latitude)];
+            }
+
             const nearByDeliveryBoys = await User.find({
                 role: "deliveryBoy",
+                isOnline: true,
                 location: {
                     $near: {
-                        $geometry: { type: "Point", coordinates: [Number(longitude), Number(latitude)] },
-                        $maxDistance: 5000
+                        $geometry: { type: "Point", coordinates: searchCoords },
+                        $maxDistance: 7000
                     }
                 }
             })
@@ -372,7 +437,7 @@ export const updateOrderStatus = async (req, res) => {
             const nearByIds = nearByDeliveryBoys.map(b => b._id)
             const busyIds = await DeliveryAssignment.find({
                 assignedTo: { $in: nearByIds },
-                status: { $nin: ["broadcasted", "brodcasted", "completed"] }
+                status: { $nin: ["broadcasted", "brodcasted", "completed", "cancelled"] }
 
             }).distinct("assignedTo")
 
@@ -505,43 +570,61 @@ export const getDeliveryBoyAssignment = async (req, res) => {
 export const acceptOrder = async (req, res) => {
     try {
         const { assignmentId } = req.params
-        const assignment = await DeliveryAssignment.findById(assignmentId)
-        if (!assignment) {
-            return res.status(400).json({ message: "assignment not found" })
-        }
-        if (assignment.status !== "broadcasted" && assignment.status !== "brodcasted") {
-            return res.status(400).json({ message: "assignment is expired" })
-        }
 
         const alreadyAssigned = await DeliveryAssignment.findOne({
             assignedTo: req.userId,
-            status: { $nin: ["broadcasted", "brodcasted", "completed"] }
+            status: { $nin: ["broadcasted", "brodcasted", "completed", "cancelled"] }
         })
 
         if (alreadyAssigned) {
-            return res.status(400).json({ message: "You are already assigned to another order" })
+            return res.status(400).json({ message: "You are already assigned to another active order" })
         }
 
-        assignment.assignedTo = req.userId
-        assignment.status = 'assigned'
-        assignment.acceptedAt = new Date()
-        await assignment.save()
+        // Phase 3.3: Atomic acceptance to prevent race condition when multiple drivers accept simultaneously
+        const assignment = await DeliveryAssignment.findOneAndUpdate(
+            {
+                _id: assignmentId,
+                status: { $in: ["broadcasted", "brodcasted"] }
+            },
+            {
+                $set: {
+                    assignedTo: req.userId,
+                    status: "assigned",
+                    acceptedAt: new Date()
+                }
+            },
+            { new: true }
+        )
+
+        if (!assignment) {
+            return res.status(409).json({ message: "This delivery assignment was already accepted by another driver or is no longer available." })
+        }
 
         const order = await Order.findById(assignment.order)
         if (!order) {
-            return res.status(400).json({ message: "order not found" })
+            return res.status(404).json({ message: "Order not found" })
         }
 
         let shopOrder = order.shopOrders.id(assignment.shopOrderId)
-        shopOrder.assignedDeliveryBoy = req.userId
-        await order.save()
+        if (shopOrder) {
+            shopOrder.assignedDeliveryBoy = req.userId
+            await order.save()
+        }
 
+        const io = req.app.get("io")
+        if (io) {
+            io.to(`order_${assignment.order}`).emit("driverAssigned", {
+                orderId: assignment.order,
+                shopOrderId: assignment.shopOrderId,
+                deliveryBoyId: req.userId
+            })
+        }
 
         return res.status(200).json({
             message: 'order accepted'
         })
     } catch (error) {
-        return res.status(500).json({ message: `accept order error ${error}` })
+        return res.status(500).json({ message: `accept order error ${error.message || error}` })
     }
 }
 
@@ -594,6 +677,9 @@ export const getCurrentOrder = async (req, res) => {
             deliveryAddress: assignment.order.deliveryAddress,
             deliveryBoyLocation,
             customerLocation,
+            assignmentId: assignment._id,
+            acceptedAt: assignment.acceptedAt || assignment.createdAt,
+            elapsedMinutes: Math.max(0, Math.floor((Date.now() - new Date(assignment.acceptedAt || assignment.createdAt).getTime()) / (60 * 1000))),
             hasActiveOtp: Boolean(shopOrder.deliveryOtp && shopOrder.otpExpires && new Date(shopOrder.otpExpires) > new Date())
         })
 
@@ -682,12 +768,45 @@ export const verifyDeliveryOtp = async (req, res) => {
 
         shopOrder.status = "delivered"
         shopOrder.deliveredAt = Date.now()
+
+        // Phase 2.5: Mark COD order as paid on delivery OTP confirmation
+        if (order.paymentMethod === "cod") {
+            order.payment = true
+            order.paidAt = new Date()
+        }
+
         await order.save()
-        await DeliveryAssignment.deleteOne({
-            shopOrderId: shopOrder._id,
-            order: order._id,
-            assignedTo: shopOrder.assignedDeliveryBoy
-        })
+
+        // Phase 3.5: Preserve delivery assignment history instead of deleting records
+        await DeliveryAssignment.updateOne(
+            {
+                shopOrderId: shopOrder._id,
+                order: order._id,
+                assignedTo: shopOrder.assignedDeliveryBoy
+            },
+            {
+                $set: {
+                    status: "completed",
+                    deliveredAt: new Date()
+                }
+            }
+        )
+
+        // Real-time synchronization: notify user and order room
+        const io = req.app.get("io")
+        if (io) {
+            if (order.user?.socketId) {
+                io.to(order.user.socketId).emit("update-status", {
+                    orderId: order._id,
+                    shopId: shopOrder.shop,
+                    status: "delivered"
+                })
+            }
+            io.to(`order_${order._id}`).emit("orderDelivered", {
+                orderId: order._id,
+                shopOrderId: shopOrder._id
+            })
+        }
 
         return res.status(200).json({ message: "Order Delivered Successfully!" })
 
@@ -828,9 +947,15 @@ export const cancelOrder = async (req, res) => {
             reason,
             cancelledAt: new Date()
         };
-        order.refund = refundInfo;
-
         await order.save();
+
+        // Phase 2.3: Restore user coupon if one was consumed for this order
+        if (order.coupon?.code) {
+            await Coupon.updateOne(
+                { code: order.coupon.code.trim().toUpperCase() },
+                { $pull: { usedBy: { order: order._id } } }
+            );
+        }
 
         // Cancel any pending delivery assignments
         await DeliveryAssignment.updateMany(
@@ -938,5 +1063,160 @@ export const rejectShopOrder = async (req, res) => {
     } catch (error) {
         console.error("rejectShopOrder error:", error);
         return res.status(500).json({ message: `Reject shop order error: ${error.message}` });
+    }
+};
+
+/**
+ * POST /api/order/rider-cancel
+ * Delivery boy / Rider cancels the assigned order
+ * Typically after average 20m if the receiver does not accept the delivery or another valid reason
+ */
+export const riderCancelOrder = async (req, res) => {
+    try {
+        const { orderId, shopOrderId, reason } = req.body;
+        const deliveryBoyId = req.userId;
+
+        if (!reason || !reason.trim()) {
+            return res.status(400).json({ message: "A valid cancellation reason is required" });
+        }
+
+        const order = await Order.findById(orderId)
+            .populate("user")
+            .populate("shopOrders.owner", "socketId name");
+
+        if (!order) {
+            return res.status(404).json({ message: "Order not found" });
+        }
+
+        const targetShopOrderId = shopOrderId || req.params.shopOrderId;
+        const shopOrder = order.shopOrders.find(so => String(so._id) === String(targetShopOrderId));
+
+        if (!shopOrder) {
+            return res.status(404).json({ message: "Shop order not found" });
+        }
+
+        // Authorization: verify that this delivery boy is assigned to this order
+        const isAssigned = String(shopOrder.assignedDeliveryBoy) === String(deliveryBoyId);
+        const assignment = await DeliveryAssignment.findOne({
+            order: order._id,
+            shopOrderId: shopOrder._id,
+            assignedTo: deliveryBoyId
+        });
+
+        if (!isAssigned && !assignment) {
+            return res.status(403).json({ message: "You are not authorized to cancel this order" });
+        }
+
+        if (shopOrder.status === "delivered") {
+            return res.status(400).json({ message: "Delivered order cannot be cancelled" });
+        }
+
+        if (shopOrder.status === "cancelled") {
+            return res.status(400).json({ message: "Order is already cancelled" });
+        }
+
+        // Calculate elapsed minutes since rider accepted the assignment
+        const acceptedTime = assignment?.acceptedAt 
+            ? new Date(assignment.acceptedAt).getTime() 
+            : new Date(assignment?.createdAt || shopOrder.updatedAt || order.createdAt).getTime();
+        const elapsedMinutes = Math.max(0, Math.floor((Date.now() - acceptedTime) / (60 * 1000)));
+
+        const cancellationNote = `${reason.trim()} (Wait time: ~${elapsedMinutes}m)`;
+
+        // Mark the shop order as cancelled
+        shopOrder.status = "cancelled";
+
+        const allCancelled = order.shopOrders.every(so => so.status === "cancelled");
+        if (allCancelled) {
+            order.cancellation = {
+                isCancelled: true,
+                cancelledBy: "rider",
+                reason: cancellationNote,
+                cancelledAt: new Date()
+            };
+        }
+
+        // Automated refund if online payment was captured
+        let refundInfo = order.refund || { refundId: null, amount: 0, status: "none", notes: null };
+        if (order.paymentMethod === "online" && order.payment && order.razorpayPaymentId) {
+            try {
+                const refundAmount = allCancelled ? order.totalAmount : shopOrder.subtotal;
+                if (refundAmount > 0) {
+                    const refundAmountInPaise = Math.round(refundAmount * 100);
+                    const razorRefund = await instance.payments.refund(order.razorpayPaymentId, {
+                        amount: refundAmountInPaise,
+                        notes: {
+                            reason: cancellationNote,
+                            orderId: order._id.toString(),
+                            shopOrderId: shopOrder._id.toString()
+                        }
+                    });
+
+                    refundInfo = {
+                        refundId: razorRefund.id,
+                        amount: (refundInfo.amount || 0) + refundAmount,
+                        status: "initiated",
+                        notes: `Refund of ₹${refundAmount} initiated due to delivery partner cancellation (${cancellationNote})`
+                    };
+                }
+            } catch (refundError) {
+                console.error("Razorpay refund error on rider cancellation:", refundError.message || refundError);
+                refundInfo = {
+                    refundId: null,
+                    amount: (refundInfo.amount || 0) + (allCancelled ? order.totalAmount : shopOrder.subtotal),
+                    status: "failed",
+                    notes: `Automated refund failed: ${refundError.message}. Admin will process manually.`
+                };
+            }
+        }
+        order.refund = refundInfo;
+
+        await order.save();
+
+        // Release the delivery boy assignment so they can accept new orders
+        await DeliveryAssignment.updateMany(
+            { order: order._id, shopOrderId: shopOrder._id },
+            { status: "cancelled" }
+        );
+
+        // Real-time socket notifications to customer and restaurant owner
+        const io = req.app.get("io");
+        if (io) {
+            if (order.user?.socketId) {
+                io.to(order.user.socketId).emit("update-status", {
+                    orderId: order._id,
+                    shopId: shopOrder.shop,
+                    status: "cancelled",
+                    reason: cancellationNote,
+                    timestamp: new Date()
+                });
+                io.to(order.user.socketId).emit("orderCancelled", {
+                    orderId: order._id,
+                    shopId: shopOrder.shop,
+                    reason: `Delivery partner cancelled: ${cancellationNote}`
+                });
+            }
+
+            if (shopOrder.owner?.socketId) {
+                io.to(shopOrder.owner.socketId).emit("orderCancelled", {
+                    orderId: order._id,
+                    shopId: shopOrder.shop,
+                    reason: `Delivery partner cancelled: ${cancellationNote}`
+                });
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: refundInfo.status === "initiated"
+                ? `Order cancelled. Refund of ₹${allCancelled ? order.totalAmount : shopOrder.subtotal} has been initiated to customer.`
+                : "Order cancelled successfully.",
+            order,
+            elapsedMinutes
+        });
+
+    } catch (error) {
+        console.error("riderCancelOrder error:", error);
+        return res.status(500).json({ message: `Rider cancel order error: ${error.message}` });
     }
 };

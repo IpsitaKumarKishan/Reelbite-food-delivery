@@ -56,14 +56,26 @@ const userSlice = createSlice({
           id: String(i.id || i._id || (i.item && (i.item._id || i.item)) || ""),
           _id: String(i._id || i.id || (i.item && (i.item._id || i.item)) || ""),
           price: Number(i.price) || 0,
-          quantity: Number(i.quantity) || 1
+          quantity: Number(i.quantity) || 1,
+          shop: i.shop?._id || i.shop || null
         }))
       } else if (action.payload) {
         const rawId = action.payload.id || action.payload._id || (action.payload.item && (action.payload.item._id || action.payload.item)) || ""
+        const newShopId = action.payload.shop?._id || action.payload.shop || null;
+
+        // Single-restaurant enforcement: if adding from a different restaurant, reset cart to new restaurant
+        if (newShopId && state.cartItems.length > 0) {
+          const currentShopId = state.cartItems[0].shop?._id || state.cartItems[0].shop || null;
+          if (currentShopId && String(currentShopId) !== String(newShopId)) {
+            state.cartItems = [];
+          }
+        }
+
         const cartItem = {
           ...action.payload,
           id: String(rawId),
           _id: String(rawId),
+          shop: newShopId,
           price: Number(action.payload.price) || 0,
           quantity: Number(action.payload.quantity) || 1
         }

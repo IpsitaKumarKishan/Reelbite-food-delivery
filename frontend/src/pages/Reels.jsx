@@ -854,6 +854,19 @@ const Reels = () => {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Phase 4.3: Pre-buffering next reel video to eliminate black screen on swipe */}
+          {reels[currentIndex + 1] && (
+            <video
+              key={`preload-${reels[currentIndex + 1]._id}`}
+              src={reels[currentIndex + 1].videoUrl}
+              preload="auto"
+              muted
+              playsInline
+              style={{ display: "none", width: 0, height: 0 }}
+              aria-hidden="true"
+            />
+          )}
         </div>
       )}
     </div>

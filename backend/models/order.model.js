@@ -92,7 +92,7 @@ const orderSchema = new mongoose.Schema({
     },
     cancellation: {
         isCancelled: { type: Boolean, default: false },
-        cancelledBy: { type: String, enum: ["customer", "owner", "admin"], default: null },
+        cancelledBy: { type: String, enum: ["customer", "owner", "admin", "rider", "deliveryBoy"], default: null },
         reason: { type: String, default: null },
         cancelledAt: { type: Date, default: null }
     },
@@ -115,6 +115,13 @@ const orderSchema = new mongoose.Schema({
        default:""
    }
 }, { timestamps: true })
+
+orderSchema.index({ user: 1, createdAt: -1 });
+orderSchema.index({ "shopOrders.owner": 1, createdAt: -1 });
+orderSchema.index({ "shopOrders.shop": 1, "shopOrders.status": 1 });
+orderSchema.index({ "shopOrders.assignedDeliveryBoy": 1 });
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ "cancellation.isCancelled": 1, createdAt: -1 });
 
 const Order=mongoose.model("Order",orderSchema)
 export default Order

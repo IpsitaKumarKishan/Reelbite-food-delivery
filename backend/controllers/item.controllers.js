@@ -36,24 +36,35 @@ export const editItem = async (req, res) => {
     try {
         const itemId = req.params.itemId
         const { name, category, foodType, price } = req.body
-        let image;
-        if (req.file) {
-            image = await uploadOnCloudinary(req.file.path)
-        }
-        const item = await Item.findByIdAndUpdate(itemId, {
-            name, category, foodType, price, image
-        }, { new: true })
+
+        const item = await Item.findById(itemId)
         if (!item) {
-            return res.status(400).json({ message: "item not found" })
+            return res.status(404).json({ message: "item not found" })
         }
-        const shop = await Shop.findOne({ owner: req.userId }).populate({
+
+        // Security: IDOR protection - verify item belongs to authenticated owner's shop
+        const shop = await Shop.findOne({ owner: req.userId })
+        if (!shop || String(item.shop) !== String(shop._id)) {
+            return res.status(403).json({ message: "Unauthorized: You can only edit dishes belonging to your own restaurant." })
+        }
+
+        const updateData = { name, category, foodType, price: Number(price) }
+        if (req.file) {
+            const uploadedUrl = await uploadOnCloudinary(req.file.path)
+            if (uploadedUrl) {
+                updateData.image = uploadedUrl
+            }
+        }
+
+        await Item.findByIdAndUpdate(itemId, updateData, { new: true })
+        await shop.populate({
             path: "items",
             options: { sort: { updatedAt: -1 } }
         })
         return res.status(200).json(shop)
 
     } catch (error) {
-        return res.status(500).json({ message: `edit item error ${error}` })
+        return res.status(500).json({ message: `edit item error ${error.message || error}` })
     }
 }
 
@@ -62,22 +73,29 @@ export const getItemById = async (req, res) => {
         const itemId = req.params.itemId
         const item = await Item.findById(itemId).populate("shop", "name image city").lean()
         if (!item) {
-            return res.status(400).json({ message: "item not found" })
+            return res.status(404).json({ message: "item not found" })
         }
         return res.status(200).json(item)
     } catch (error) {
-        return res.status(500).json({ message: `get item error ${error}` })
+        return res.status(500).json({ message: `get item error ${error.message || error}` })
     }
 }
 
 export const deleteItem = async (req, res) => {
     try {
         const itemId = req.params.itemId
-        const item = await Item.findByIdAndDelete(itemId)
+        const item = await Item.findById(itemId)
         if (!item) {
-            return res.status(400).json({ message: "item not found" })
+            return res.status(404).json({ message: "item not found" })
         }
+
+        // Security: IDOR protection - verify item belongs to authenticated owner's shop
         const shop = await Shop.findOne({ owner: req.userId })
+        if (!shop || String(item.shop) !== String(shop._id)) {
+            return res.status(403).json({ message: "Unauthorized: You can only delete dishes belonging to your own restaurant." })
+        }
+
+        await Item.findByIdAndDelete(itemId)
         shop.items = shop.items.filter(i => !i.equals(item._id))
         await shop.save()
         await shop.populate({
@@ -87,7 +105,7 @@ export const deleteItem = async (req, res) => {
         return res.status(200).json(shop)
 
     } catch (error) {
-        return res.status(500).json({ message: `delete item error ${error}` })
+        return res.status(500).json({ message: `delete item error ${error.message || error}` })
     }
 }
 

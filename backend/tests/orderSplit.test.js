@@ -37,7 +37,8 @@ describe("computeOrderSplit unit tests", () => {
     const result = computeOrderSplit(orderData);
 
     assert.strictEqual(result.subtotal, 600);
-    assert.strictEqual(result.deliveryFee, 0);
+    assert.strictEqual(result.deliveryFee, 0); // Customer gets free delivery
+    assert.strictEqual(result.deliveryPartnerPayout, 40); // Driver is still paid base fee via platform subsidy
   });
 
   test("supports multiple shops with custom commission rates", () => {

@@ -1,7 +1,7 @@
 import Reel from "../models/reel.model.js";
 import Shop from "../models/shop.model.js";
 import Item from "../models/item.model.js";
-import uploadOnCloudinary, { uploadVideoOnCloudinary } from "../utils/cloudinary.js";
+import uploadOnCloudinary, { uploadVideoOnCloudinary, deleteVideoFromCloudinary } from "../utils/cloudinary.js";
 import fs from "fs";
 import path from "path";
 import RECOMMENDATION_WEIGHTS from "../config/recommendationWeights.js";
@@ -157,7 +157,7 @@ export const getAllReels = async (req, res) => {
       reelQuery.shop = { $in: shopIds };
     }
 
-    // Fetch candidate pool passing hard location filter
+    // Fetch candidate pool passing hard location filter (capped at 150 most recent candidates for memory protection)
     // excludeIds: $nin filter to avoid showing already-seen reels in this session.
     const reelFindQuery = { ...reelQuery };
     if (excludeIdSet.size > 0) {
@@ -165,6 +165,8 @@ export const getAllReels = async (req, res) => {
       reelFindQuery._id = { $nin: Array.from(excludeIdSet) };
     }
     const candidateReels = await Reel.find(reelFindQuery)
+      .sort({ createdAt: -1 })
+      .limit(150)
       .populate("owner", "fullName email")
       .populate("shop", "name city image")
       .populate("foodItem", "name price image category foodType rating shop");
@@ -344,11 +346,12 @@ export const getAllReels = async (req, res) => {
       const topCats = sortedCategories.slice(0, EXP.topCategoriesCount);
 
       if (topCats.length > 0) {
-        // Softmax over the top-N affinity scores → probability distribution
-        const topAffinityValues = topCats.map((cat) => categoryAffinity[cat]);
-        const expValues = topAffinityValues.map((v) => Math.exp(v));
+        // Numerically stable Softmax: subtract maximum affinity to avoid Math.exp(v) overflow to Infinity / NaN
+        const topAffinityValues = topCats.map((cat) => Number(categoryAffinity[cat]) || 0);
+        const maxAffinity = Math.max(...topAffinityValues);
+        const expValues = topAffinityValues.map((v) => Math.exp(v - maxAffinity));
         const expSum = expValues.reduce((s, v) => s + v, 0);
-        const softmaxWeights = expValues.map((v) => v / expSum);
+        const softmaxWeights = expSum > 0 ? expValues.map((v) => v / expSum) : topCats.map(() => 1 / topCats.length);
 
         // Build cumulative distribution for weighted random sampling
         const cdf = [];
@@ -499,6 +502,11 @@ export const deleteReel = async (req, res) => {
 
     if (reel.owner.toString() !== req.userId.toString()) {
       return res.status(403).json({ message: "Unauthorized to delete this reel" });
+    }
+
+    // Phase 4.4: Purge video asset from Cloudinary to prevent orphaned media
+    if (reel.videoUrl) {
+      await deleteVideoFromCloudinary(reel.videoUrl);
     }
 
     await Reel.findByIdAndDelete(id);

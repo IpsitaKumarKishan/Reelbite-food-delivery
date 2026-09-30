@@ -46,9 +46,17 @@ const shopSchema=new mongoose.Schema({
         type: String,
         enum: ["active", "pending", "suspended"],
         default: "active"
+    },
+    location: {
+        type: { type: String, enum: ['Point'], default: 'Point' },
+        coordinates: { type: [Number], default: [0, 0] }
     }
 
 },{timestamps:true})
+
+shopSchema.index({ location: '2dsphere' })
+shopSchema.index({ owner: 1 })
+shopSchema.index({ city: 1, status: 1 })
 
 const Shop=mongoose.model("Shop",shopSchema)
 export default Shop

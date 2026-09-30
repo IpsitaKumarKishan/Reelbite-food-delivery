@@ -36,6 +36,10 @@ function CreateEditShop() {
            formData.append("city",city) 
            formData.append("state",state) 
            formData.append("address",address) 
+           if(userData?.location?.coordinates?.length === 2 && (userData.location.coordinates[0] !== 0 || userData.location.coordinates[1] !== 0)){
+            formData.append("longitude", userData.location.coordinates[0])
+            formData.append("latitude", userData.location.coordinates[1])
+           }
            if(backendImage){
             formData.append("image",backendImage)
            }

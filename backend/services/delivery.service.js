@@ -16,7 +16,7 @@ export const findNearbyAvailableDeliveryBoys = async (longitude, latitude, maxDi
   const nearByIds = nearByDeliveryBoys.map((b) => b._id);
   const busyIds = await DeliveryAssignment.find({
     assignedTo: { $in: nearByIds },
-    status: { $nin: ["broadcasted", "brodcasted", "completed"] }
+    status: { $nin: ["broadcasted", "brodcasted", "completed", "cancelled"] }
   }).distinct("assignedTo");
 
   const busyIdSet = new Set(busyIds.map((id) => String(id)));

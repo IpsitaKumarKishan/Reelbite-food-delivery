@@ -33,20 +33,52 @@ function TrackOrderPage() {
     }
   };
 
-  // Socket for live tracking
+  // Socket for live tracking and status updates
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !orderId) return;
+
+    socket.emit('joinOrder', { orderId });
+
     const handleLocationUpdate = ({ deliveryBoyId, latitude, longitude }) => {
       setLiveLocations((prev) => ({
         ...prev,
         [deliveryBoyId]: { lat: latitude, lon: longitude },
       }));
     };
-    socket.on('updateDeliveryLocation', handleLocationUpdate);
-    return () => {
-      socket.off('updateDeliveryLocation', handleLocationUpdate);
+
+    const handleStatusUpdate = (payload) => {
+      if (String(payload?.orderId) === String(orderId)) {
+        handleGetOrder();
+      }
     };
-  }, [socket]);
+
+    const handleDelivered = (payload) => {
+      if (String(payload?.orderId) === String(orderId)) {
+        handleGetOrder();
+        toast.success("Your food has been delivered! Enjoy your meal!");
+      }
+    };
+
+    const handleDriverAssigned = (payload) => {
+      if (String(payload?.orderId) === String(orderId)) {
+        handleGetOrder();
+        toast("A delivery partner has been assigned to your order!", { icon: "🛵" });
+      }
+    };
+
+    socket.on('updateDeliveryLocation', handleLocationUpdate);
+    socket.on('update-status', handleStatusUpdate);
+    socket.on('orderDelivered', handleDelivered);
+    socket.on('driverAssigned', handleDriverAssigned);
+
+    return () => {
+      socket.emit('leaveOrder', { orderId });
+      socket.off('updateDeliveryLocation', handleLocationUpdate);
+      socket.off('update-status', handleStatusUpdate);
+      socket.off('orderDelivered', handleDelivered);
+      socket.off('driverAssigned', handleDriverAssigned);
+    };
+  }, [socket, orderId]);
 
   useEffect(() => {
     handleGetOrder();
