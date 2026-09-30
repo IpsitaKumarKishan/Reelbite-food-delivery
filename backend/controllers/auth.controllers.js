@@ -189,7 +189,7 @@ export const signUp = async (req, res) => {
 
         // Security: Whitelist allowed registration roles. Administrative roles can never be self-assigned.
         const assignedRole = ALLOWED_PUBLIC_ROLES.includes(role) ? role : "user";
-     
+
         const hashedPassword = await bcrypt.hash(password, 10)
         const userPayload = {
             fullName: fullName.trim(),
@@ -208,7 +208,7 @@ export const signUp = async (req, res) => {
 
         const token = await genToken(user._id)
         res.cookie("token", token, COOKIE_OPTIONS)
-  
+
         return res.status(201).json(sanitizeUser(user))
 
     } catch (error) {
@@ -249,7 +249,7 @@ export const signIn = async (req, res) => {
         if (user.status === "suspended") {
             return res.status(403).json({ message: "Your account has been suspended by the platform administrator." });
         }
-        
+
         if (!user.password) {
             return res.status(400).json({ message: "Account does not have a password set. Please log in using Google or reset password." })
         }
@@ -261,7 +261,7 @@ export const signIn = async (req, res) => {
 
         const token = await genToken(user._id)
         res.cookie("token", token, COOKIE_OPTIONS)
-  
+
         return res.status(200).json(sanitizeUser(user))
 
     } catch (error) {
@@ -283,38 +283,38 @@ export const signOut = async (req, res) => {
 }
 
 export const sendOtp = async (req, res) => {
-  try {
-    const { email, mobile } = req.body
-    const rawTarget = mobile || email
-    if (!rawTarget) {
-      return res.status(400).json({ message: "Mobile number or email is required." })
+    try {
+        const { email, mobile } = req.body
+        const rawTarget = mobile || email
+        if (!rawTarget) {
+            return res.status(400).json({ message: "Mobile number or email is required." })
+        }
+
+        const clean = String(rawTarget).trim()
+        const isEmail = clean.includes("@")
+        const query = isEmail ? { email: clean.toLowerCase() } : { mobile: clean.replace(/\D/g, '') }
+
+        const user = await User.findOne(query)
+        if (!user) {
+            return res.status(400).json({ message: "User does not exist." })
+        }
+
+        const otp = Math.floor(1000 + Math.random() * 9000).toString()
+        user.resetOtp = otp
+        user.otpExpires = Date.now() + 5 * 60 * 1000
+        user.isOtpVerified = false
+        await user.save()
+
+        if (user.email && isEmail) {
+            await sendOtpMail(user.email, otp)
+        } else if (user.mobile) {
+            await sendPhoneOtpSms(user.mobile, otp)
+        }
+
+        return res.status(200).json({ message: "OTP sent successfully." })
+    } catch (error) {
+        return res.status(500).json(`send otp error ${error}`)
     }
-
-    const clean = String(rawTarget).trim()
-    const isEmail = clean.includes("@")
-    const query = isEmail ? { email: clean.toLowerCase() } : { mobile: clean.replace(/\D/g, '') }
-
-    const user = await User.findOne(query)
-    if (!user) {
-       return res.status(400).json({ message: "User does not exist." })
-    }
-
-    const otp = Math.floor(1000 + Math.random() * 9000).toString()
-    user.resetOtp = otp
-    user.otpExpires = Date.now() + 5 * 60 * 1000
-    user.isOtpVerified = false
-    await user.save()
-
-    if (user.email && isEmail) {
-        await sendOtpMail(user.email, otp)
-    } else if (user.mobile) {
-        await sendPhoneOtpSms(user.mobile, otp)
-    }
-
-    return res.status(200).json({ message: "OTP sent successfully." })
-  } catch (error) {
-     return res.status(500).json(`send otp error ${error}`)
-  }  
 }
 
 export const verifyOtp = async (req, res) => {
@@ -335,7 +335,7 @@ export const verifyOtp = async (req, res) => {
         await user.save()
         return res.status(200).json({ message: "OTP verified successfully." })
     } catch (error) {
-         return res.status(500).json(`verify otp error ${error}`)
+        return res.status(500).json(`verify otp error ${error}`)
     }
 }
 
@@ -349,7 +349,7 @@ export const resetPassword = async (req, res) => {
 
         const user = await User.findOne(query)
         if (!user || !user.isOtpVerified) {
-           return res.status(400).json({ message: "OTP verification required." })
+            return res.status(400).json({ message: "OTP verification required." })
         }
         const hashedPassword = await bcrypt.hash(newPassword, 10)
         user.password = hashedPassword
@@ -357,7 +357,7 @@ export const resetPassword = async (req, res) => {
         await user.save()
         return res.status(200).json({ message: "Password reset successfully." })
     } catch (error) {
-         return res.status(500).json(`reset password error ${error}`)
+        return res.status(500).json(`reset password error ${error}`)
     }
 }
 

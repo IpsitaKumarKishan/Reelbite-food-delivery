@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Lock, Mail, UtensilsCrossed, AlertCircle, ArrowRight, ArrowLeft, Phone } from 'lucide-react';
+import { Eye, EyeOff, Lock, UtensilsCrossed, AlertCircle, ArrowRight, ArrowLeft, Phone } from 'lucide-react';
 import { FcGoogle } from 'react-icons/fc';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
