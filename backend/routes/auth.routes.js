@@ -1,7 +1,7 @@
 import express from "express"
 import { body } from "express-validator"
 import validate from "../middlewares/validate.js"
-import { googleAuth, resetPassword, sendOtp, signIn, signOut, signUp, verifyOtp } from "../controllers/auth.controllers.js"
+import { googleAuth, resetPassword, sendOtp, signIn, signOut, signUp, verifyOtp, sendPhoneOtp, verifyPhoneOtp } from "../controllers/auth.controllers.js"
 
 import { validatePhoneNumber } from "../utils/phoneValidator.js"
 
@@ -26,6 +26,37 @@ authRouter.post(
   body("role").isIn(["user", "owner", "deliveryBoy"]).withMessage("Invalid role specified"),
   validate,
   signUp
+)
+
+authRouter.post(
+  "/send-phone-otp",
+  body("mobile")
+    .trim()
+    .notEmpty()
+    .withMessage("Mobile phone number is required")
+    .custom((value) => {
+      const result = validatePhoneNumber(value);
+      if (!result.isValid) {
+        throw new Error(result.message);
+      }
+      return true;
+    }),
+  validate,
+  sendPhoneOtp
+)
+
+authRouter.post(
+  "/verify-phone-otp",
+  body("mobile")
+    .trim()
+    .notEmpty()
+    .withMessage("Mobile phone number is required"),
+  body("otp")
+    .trim()
+    .isLength({ min: 6, max: 6 })
+    .withMessage("OTP must be exactly 6 digits"),
+  validate,
+  verifyPhoneOtp
 )
 
 authRouter.post(

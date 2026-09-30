@@ -1,8 +1,10 @@
 import User from "../models/user.model.js"
+import PhoneOtp from "../models/phoneOtp.model.js"
 import bcrypt from "bcryptjs"
 import genToken from "../utils/token.js"
 import { sendOtpMail } from "../utils/mail.js"
 import { validatePhoneNumber } from "../utils/phoneValidator.js"
+import { sendPhoneOtpSms } from "../utils/smsService.js"
 
 const COOKIE_OPTIONS = {
     secure: process.env.NODE_ENV === "production",
@@ -21,6 +23,115 @@ const sanitizeUser = (user) => {
 
 const ALLOWED_PUBLIC_ROLES = ["user", "owner", "deliveryBoy"];
 
+/**
+ * POST /api/auth/send-phone-otp
+ * Generates and sends a 6-digit OTP to verify a mobile phone number for new signups.
+ */
+export const sendPhoneOtp = async (req, res) => {
+    try {
+        const { mobile } = req.body;
+        const phoneValidation = validatePhoneNumber(mobile);
+        if (!phoneValidation.isValid) {
+            return res.status(400).json({ message: phoneValidation.message });
+        }
+        const cleanMobile = phoneValidation.normalizedMobile;
+
+        // Ensure phone number isn't already registered
+        const existingUser = await User.findOne({ mobile: cleanMobile });
+        if (existingUser) {
+            return res.status(400).json({ message: "Mobile number is already registered with another account." });
+        }
+
+        // Rate limit: 60s cooldown between OTP requests
+        const recentOtp = await PhoneOtp.findOne({
+            mobile: cleanMobile,
+            createdAt: { $gt: new Date(Date.now() - 60 * 1000) }
+        });
+        if (recentOtp) {
+            const secondsLeft = Math.ceil((recentOtp.createdAt.getTime() + 60000 - Date.now()) / 1000);
+            return res.status(429).json({ message: `Please wait ${secondsLeft > 0 ? secondsLeft : 60} seconds before requesting a new OTP.` });
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // Invalidate previous unverified OTPs for this phone number
+        await PhoneOtp.deleteMany({ mobile: cleanMobile, verified: false });
+
+        await PhoneOtp.create({
+            mobile: cleanMobile,
+            otp,
+            expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes validity
+            verified: false,
+            attempts: 0
+        });
+
+        await sendPhoneOtpSms(cleanMobile, otp);
+
+        const responseData = {
+            message: `OTP sent successfully to +91 ${cleanMobile}`,
+            mobile: cleanMobile
+        };
+        // For local development & automated test convenience:
+        if (process.env.NODE_ENV !== "production") {
+            responseData.devOtp = otp;
+        }
+
+        return res.status(200).json(responseData);
+    } catch (error) {
+        return res.status(500).json({ message: `sendPhoneOtp error: ${error.message || error}` });
+    }
+};
+
+/**
+ * POST /api/auth/verify-phone-otp
+ * Verifies the 6-digit OTP for a given mobile number.
+ */
+export const verifyPhoneOtp = async (req, res) => {
+    try {
+        const { mobile, otp } = req.body;
+        const phoneValidation = validatePhoneNumber(mobile);
+        if (!phoneValidation.isValid) {
+            return res.status(400).json({ message: phoneValidation.message });
+        }
+        const cleanMobile = phoneValidation.normalizedMobile;
+
+        if (!otp || String(otp).trim().length !== 6) {
+            return res.status(400).json({ message: "A valid 6-digit OTP is required." });
+        }
+
+        const phoneOtp = await PhoneOtp.findOne({
+            mobile: cleanMobile,
+            verified: false
+        }).sort({ createdAt: -1 });
+
+        if (!phoneOtp || phoneOtp.expiresAt < new Date()) {
+            return res.status(400).json({ message: "OTP has expired or does not exist. Please request a new OTP." });
+        }
+
+        if (phoneOtp.attempts >= 5) {
+            await PhoneOtp.deleteOne({ _id: phoneOtp._id });
+            return res.status(400).json({ message: "Too many failed attempts. Please request a new OTP." });
+        }
+
+        if (phoneOtp.otp !== String(otp).trim()) {
+            phoneOtp.attempts += 1;
+            await phoneOtp.save();
+            return res.status(400).json({ message: `Incorrect OTP. ${5 - phoneOtp.attempts} attempts remaining.` });
+        }
+
+        phoneOtp.verified = true;
+        await phoneOtp.save();
+
+        return res.status(200).json({
+            message: "Mobile phone verified successfully.",
+            mobile: cleanMobile,
+            verified: true
+        });
+    } catch (error) {
+        return res.status(500).json({ message: `verifyPhoneOtp error: ${error.message || error}` });
+    }
+};
+
 export const signUp = async (req, res) => {
     try {
         const { fullName, email, password, mobile, role } = req.body
@@ -31,6 +142,12 @@ export const signUp = async (req, res) => {
             return res.status(400).json({ message: phoneValidation.message })
         }
         const cleanMobile = phoneValidation.normalizedMobile
+
+        // Validation Layer: Ensure phone was verified via OTP
+        const verifiedOtp = await PhoneOtp.findOne({ mobile: cleanMobile, verified: true });
+        if (!verifiedOtp && process.env.BYPASS_PHONE_OTP !== "true") {
+            return res.status(400).json({ message: "Please verify your mobile number with OTP before completing registration." });
+        }
 
         let user = await User.findOne({ email: email.toLowerCase() })
         if (user) {
@@ -58,6 +175,9 @@ export const signUp = async (req, res) => {
             mobile: cleanMobile,
             password: hashedPassword
         })
+
+        // Clean up OTP record once successfully registered
+        await PhoneOtp.deleteMany({ mobile: cleanMobile });
 
         const token = await genToken(user._id)
         res.cookie("token", token, COOKIE_OPTIONS)
