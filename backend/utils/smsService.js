@@ -2,7 +2,7 @@ import twilio from "twilio";
 
 /**
  * SMS Dispatch Service
- * Handles SMS OTP transmissions via Twilio SMS Gateway, Fast2SMS, or secure dev fallback.
+ * Handles SMS OTP transmissions via Twilio SMS Gateway or secure dev fallback.
  */
 
 // Cache Twilio client instance
@@ -45,7 +45,7 @@ export const sendPhoneOtpSms = async (mobile, otp) => {
   const formattedMobile = formatE164Number(mobile);
   const messageBody = `Your ReelBite verification code is ${otp}. Valid for 5 minutes. Do not share this code with anyone.`;
 
-  // 1. Primary Provider: Twilio SMS
+  // 1. Twilio SMS Gateway Dispatch
   if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
     const client = getTwilioClient();
     const fromNumber = process.env.TWILIO_PHONE_NUMBER;
@@ -75,7 +75,7 @@ export const sendPhoneOtpSms = async (mobile, otp) => {
         };
       } catch (err) {
         console.error(`[Twilio SMS Error]:`, err.message || err);
-        // If in production, throw or return failure details so caller can respond
+        // If in production, return failure details so caller can respond
         if (process.env.NODE_ENV === "production") {
           return { success: false, provider: "twilio", error: err.message };
         }
@@ -85,29 +85,7 @@ export const sendPhoneOtpSms = async (mobile, otp) => {
     }
   }
 
-  // 2. Secondary Provider: Fast2SMS (Optional fallback for Indian numbers)
-  if (process.env.FAST2SMS_API_KEY) {
-    try {
-      const response = await fetch("https://www.fast2sms.com/dev/bulkV2", {
-        method: "POST",
-        headers: {
-          authorization: process.env.FAST2SMS_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          route: "otp",
-          variables_values: otp,
-          numbers: mobile,
-        }),
-      });
-      const data = await response.json();
-      return { success: true, provider: "fast2sms", data };
-    } catch (err) {
-      console.error("[Fast2SMS Error]:", err.message || err);
-    }
-  }
-
-  // 3. Fallback logger for local development / testing
+  // 2. Dev Fallback Logger
   console.log(`\n======================================================`);
   console.log(`📲 [REELBITE PHONE OTP DISPATCH]`);
   console.log(`To: ${formattedMobile || mobile}`);
