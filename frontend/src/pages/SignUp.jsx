@@ -30,6 +30,7 @@ function SignUp() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [devOtpHint, setDevOtpHint] = useState('');
+  const [trialNotice, setTrialNotice] = useState('');
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -78,6 +79,12 @@ function SignUp() {
       setOtpTimer(60);
       if (res.data?.devOtp) {
         setDevOtpHint(res.data.devOtp);
+        setPhoneOtp(res.data.devOtp); // Auto-fill for instant testing
+      }
+      if (res.data?.trialNotice) {
+        setTrialNotice(res.data.trialNotice);
+      } else {
+        setTrialNotice('');
       }
     } catch (error) {
       setErr(error?.response?.data?.message || 'Failed to send OTP to mobile number');
@@ -425,8 +432,14 @@ function SignUp() {
                   initial={{ opacity: 0, height: 0, y: -6 }}
                   animate={{ opacity: 1, height: 'auto', y: 0 }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="mt-2.5 p-3 rounded-2xl bg-orange-50/80 border border-orange-200/80 space-y-2"
+                  className="mt-2.5 p-3 rounded-2xl bg-orange-50/80 border border-orange-200/80 space-y-2.5"
                 >
+                  {trialNotice && (
+                    <div className="text-[11px] bg-amber-100/90 border border-amber-300 text-amber-900 rounded-xl p-2.5 leading-snug">
+                      <span className="font-extrabold text-amber-950">⚠️ Twilio Trial Notice:</span> Real SMS can only reach numbers added to your Twilio Console's <em>Verified Caller IDs</em>. We have <strong>auto-filled the OTP below</strong> so you can click <strong>Verify</strong> right away!
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold text-stone-700 flex items-center gap-1.5">
                       <ShieldCheck className="w-4 h-4 text-[#ff5200]" />
@@ -435,10 +448,10 @@ function SignUp() {
                     {devOtpHint && (
                       <span
                         onClick={() => setPhoneOtp(devOtpHint)}
-                        className="text-[10px] font-extrabold text-[#ff5200] bg-orange-100 hover:bg-orange-200 px-2 py-0.5 rounded cursor-pointer transition"
+                        className="text-[10px] font-extrabold text-[#ff5200] bg-orange-100 hover:bg-orange-200 px-2 py-0.5 rounded cursor-pointer transition border border-orange-300"
                         title="Click to auto-fill development OTP"
                       >
-                        Dev OTP: {devOtpHint}
+                        Dev OTP: {devOtpHint} (Auto-filled)
                       </span>
                     )}
                   </div>

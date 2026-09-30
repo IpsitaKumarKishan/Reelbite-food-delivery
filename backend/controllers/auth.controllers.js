@@ -68,12 +68,30 @@ export const sendPhoneOtp = async (req, res) => {
             provider: smsResult?.provider || "local"
         });
 
+        const isTwilioDelivered = smsResult?.provider === "twilio_verify" || smsResult?.provider === "twilio";
+        const isTrialBlocked = Boolean(
+            smsResult?.twilioError &&
+            (smsResult.twilioError.includes("verified tester") ||
+             smsResult.twilioError.includes("verified recipient") ||
+             smsResult.twilioError.includes("trial"))
+        );
+
         const responseData = {
-            message: `OTP sent successfully to +91 ${cleanMobile}`,
-            mobile: cleanMobile
+            message: isTwilioDelivered
+                ? `Live SMS OTP sent successfully to +91 ${cleanMobile}`
+                : `OTP generated for +91 ${cleanMobile}`,
+            mobile: cleanMobile,
+            provider: smsResult?.provider || "local",
+            isTwilioDelivered,
         };
-        // For local development & automated test convenience:
-        if (process.env.NODE_ENV !== "production") {
+
+        if (isTrialBlocked) {
+            responseData.trialNotice = "Twilio Trial Restriction: Real SMS is only delivered to numbers verified in your Twilio Console (under Verified Caller IDs). Dev OTP is provided below for immediate testing.";
+            responseData.twilioError = smsResult.twilioError;
+        }
+
+        // Return devOtp whenever in dev mode or whenever Twilio delivery was restricted
+        if (process.env.NODE_ENV !== "production" || !isTwilioDelivered) {
             responseData.devOtp = otp;
         }
 

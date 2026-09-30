@@ -43,77 +43,88 @@ export const formatE164Number = (mobile) => {
 
 export const sendPhoneOtpSms = async (mobile, otp) => {
   const formattedMobile = formatE164Number(mobile);
-  const messageBody = `Your ReelBite verification code is ${otp}. Valid for 5 minutes. Do not share this code with anyone.`;
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER || "+17372508034";
+  const client = getTwilioClient();
+  let lastTwilioError = null;
 
-  // 1. Primary: Twilio Verify API (Recommended for trial & production OTP verification)
-  const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
-  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && verifyServiceSid) {
-    const client = getTwilioClient();
-    if (client) {
-      try {
-        const verification = await client.verify.v2.services(verifyServiceSid)
-          .verifications
-          .create({ to: formattedMobile, channel: "sms" });
+  // 1. Primary: Twilio Programmable SMS Dispatch (client.messages.create)
+  if (client) {
+    // Attempt custom message body first
+    try {
+      const message = await client.messages.create({
+        body: `Your ReelBite verification code is ${otp}. Valid for 5 minutes. Do not share this code with anyone.`,
+        from: fromNumber,
+        to: formattedMobile,
+      });
 
-        console.log(`[Twilio Verify SMS Sent]: SID=${verification.sid} Status=${verification.status} To=${formattedMobile}`);
-        return {
-          success: true,
-          provider: "twilio_verify",
-          verificationSid: verification.sid,
-          status: verification.status,
-        };
-      } catch (err) {
-        console.error(`[Twilio Verify Error]:`, err.message || err);
-      }
-    }
-  }
+      console.log(`[Twilio SMS Sent]: SID=${message.sid} To=${formattedMobile}`);
+      return {
+        success: true,
+        provider: "twilio",
+        messageSid: message.sid,
+        status: message.status,
+      };
+    } catch (err) {
+      lastTwilioError = err.message || String(err);
+      console.warn(`[Twilio SMS Attempt]: ${lastTwilioError}`);
 
-  // 2. Secondary: Twilio Programmable SMS Dispatch
-  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-    const client = getTwilioClient();
-    const fromNumber = process.env.TWILIO_PHONE_NUMBER;
-    const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+      // If trial account requires predefined template (e.g., 'sms_appointment_reminders')
+      if (lastTwilioError.includes("predefined SMS templates") || lastTwilioError.includes("template")) {
+        try {
+          const templateMessage = await client.messages.create({
+            body: "sms_appointment_reminders",
+            from: fromNumber,
+            to: formattedMobile,
+          });
 
-    if (client && (fromNumber || messagingServiceSid)) {
-      try {
-        const payload = {
-          body: messageBody,
-          to: formattedMobile,
-        };
-
-        if (messagingServiceSid) {
-          payload.messagingServiceSid = messagingServiceSid;
-        } else {
-          payload.from = fromNumber;
+          console.log(`[Twilio Template SMS Sent]: SID=${templateMessage.sid} To=${formattedMobile}`);
+          return {
+            success: true,
+            provider: "twilio_template",
+            messageSid: templateMessage.sid,
+            status: templateMessage.status,
+          };
+        } catch (templateErr) {
+          lastTwilioError = templateErr.message || String(templateErr);
+          console.error(`[Twilio Template Error]:`, lastTwilioError);
         }
-
-        const twilioMessage = await client.messages.create(payload);
-
-        console.log(`[Twilio SMS Sent]: SID=${twilioMessage.sid} To=${formattedMobile}`);
-        return {
-          success: true,
-          provider: "twilio",
-          messageSid: twilioMessage.sid,
-          status: twilioMessage.status,
-        };
-      } catch (err) {
-        console.error(`[Twilio SMS Error]:`, err.message || err);
       }
-    } else {
-      console.warn("[Twilio Warning]: TWILIO_PHONE_NUMBER or TWILIO_MESSAGING_SERVICE_SID is missing in environment variables.");
     }
   }
 
-  // 3. Dev Fallback Logger
+  // 2. Secondary: Twilio Verify Service (Delivers direct 6-digit numeric OTP)
+  const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+  if (client && verifyServiceSid) {
+    try {
+      const verification = await client.verify.v2.services(verifyServiceSid)
+        .verifications
+        .create({ to: formattedMobile, channel: "sms" });
+
+      console.log(`[Twilio Verify SMS Sent]: SID=${verification.sid} Status=${verification.status} To=${formattedMobile}`);
+      return {
+        success: true,
+        provider: "twilio_verify",
+        verificationSid: verification.sid,
+        status: verification.status,
+      };
+    } catch (err) {
+      lastTwilioError = err.message || String(err);
+      console.error(`[Twilio Verify Error]:`, lastTwilioError);
+    }
+  }
+
+  // 3. Fallback: Log to console and provide dev OTP
   console.log(`\n======================================================`);
   console.log(`📲 [REELBITE PHONE OTP DISPATCH]`);
   console.log(`To: ${formattedMobile || mobile}`);
   console.log(`Your ReelBite verification code is: [ ${otp} ]`);
   console.log(`Valid for 5 minutes. Do not share with anyone.`);
-  console.log(`(Configure TWILIO_ACCOUNT_SID & TWILIO_AUTH_TOKEN in .env to deliver real SMS)`);
+  if (lastTwilioError) {
+    console.log(`⚠️ Twilio notice: ${lastTwilioError}`);
+  }
   console.log(`======================================================\n`);
 
-  return { success: true, provider: "console_fallback" };
+  return { success: true, provider: "console_fallback", twilioError: lastTwilioError };
 };
 
 /**
