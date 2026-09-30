@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs"
 import genToken from "../utils/token.js"
 import { sendOtpMail } from "../utils/mail.js"
 import { validatePhoneNumber } from "../utils/phoneValidator.js"
-import { sendPhoneOtpSms } from "../utils/smsService.js"
+import { sendPhoneOtpSms, verifyTwilioOtp } from "../utils/smsService.js"
 
 const COOKIE_OPTIONS = {
     secure: process.env.NODE_ENV === "production",
@@ -57,15 +57,16 @@ export const sendPhoneOtp = async (req, res) => {
         // Invalidate previous unverified OTPs for this phone number
         await PhoneOtp.deleteMany({ mobile: cleanMobile, verified: false });
 
+        const smsResult = await sendPhoneOtpSms(cleanMobile, otp);
+
         await PhoneOtp.create({
             mobile: cleanMobile,
             otp,
             expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes validity
             verified: false,
-            attempts: 0
+            attempts: 0,
+            provider: smsResult?.provider || "local"
         });
-
-        await sendPhoneOtpSms(cleanMobile, otp);
 
         const responseData = {
             message: `OTP sent successfully to +91 ${cleanMobile}`,
@@ -113,7 +114,24 @@ export const verifyPhoneOtp = async (req, res) => {
             return res.status(400).json({ message: "Too many failed attempts. Please request a new OTP." });
         }
 
-        if (phoneOtp.otp !== String(otp).trim()) {
+        let isVerified = false;
+
+        // Check with Twilio Verify if provider was twilio_verify
+        if (phoneOtp.provider === "twilio_verify") {
+            const twilioRes = await verifyTwilioOtp(cleanMobile, otp);
+            if (twilioRes.approved) {
+                isVerified = true;
+            }
+        }
+
+        // Accept local OTP if provider is local or in dev/test mode
+        if (!isVerified && (phoneOtp.provider !== "twilio_verify" || process.env.NODE_ENV !== "production")) {
+            if (phoneOtp.otp === String(otp).trim()) {
+                isVerified = true;
+            }
+        }
+
+        if (!isVerified) {
             phoneOtp.attempts += 1;
             await phoneOtp.save();
             return res.status(400).json({ message: `Incorrect OTP. ${5 - phoneOtp.attempts} attempts remaining.` });

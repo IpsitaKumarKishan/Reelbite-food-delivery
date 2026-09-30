@@ -24,6 +24,10 @@ const phoneOtpSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    provider: {
+      type: String,
+      default: "local",
+    },
   },
   { timestamps: true }
 );

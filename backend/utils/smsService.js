@@ -45,7 +45,30 @@ export const sendPhoneOtpSms = async (mobile, otp) => {
   const formattedMobile = formatE164Number(mobile);
   const messageBody = `Your ReelBite verification code is ${otp}. Valid for 5 minutes. Do not share this code with anyone.`;
 
-  // 1. Twilio SMS Gateway Dispatch
+  // 1. Primary: Twilio Verify API (Recommended for trial & production OTP verification)
+  const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && verifyServiceSid) {
+    const client = getTwilioClient();
+    if (client) {
+      try {
+        const verification = await client.verify.v2.services(verifyServiceSid)
+          .verifications
+          .create({ to: formattedMobile, channel: "sms" });
+
+        console.log(`[Twilio Verify SMS Sent]: SID=${verification.sid} Status=${verification.status} To=${formattedMobile}`);
+        return {
+          success: true,
+          provider: "twilio_verify",
+          verificationSid: verification.sid,
+          status: verification.status,
+        };
+      } catch (err) {
+        console.error(`[Twilio Verify Error]:`, err.message || err);
+      }
+    }
+  }
+
+  // 2. Secondary: Twilio Programmable SMS Dispatch
   if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
     const client = getTwilioClient();
     const fromNumber = process.env.TWILIO_PHONE_NUMBER;
@@ -75,17 +98,13 @@ export const sendPhoneOtpSms = async (mobile, otp) => {
         };
       } catch (err) {
         console.error(`[Twilio SMS Error]:`, err.message || err);
-        // If in production, return failure details so caller can respond
-        if (process.env.NODE_ENV === "production") {
-          return { success: false, provider: "twilio", error: err.message };
-        }
       }
     } else {
       console.warn("[Twilio Warning]: TWILIO_PHONE_NUMBER or TWILIO_MESSAGING_SERVICE_SID is missing in environment variables.");
     }
   }
 
-  // 2. Dev Fallback Logger
+  // 3. Dev Fallback Logger
   console.log(`\n======================================================`);
   console.log(`📲 [REELBITE PHONE OTP DISPATCH]`);
   console.log(`To: ${formattedMobile || mobile}`);
@@ -95,5 +114,35 @@ export const sendPhoneOtpSms = async (mobile, otp) => {
   console.log(`======================================================\n`);
 
   return { success: true, provider: "console_fallback" };
+};
+
+/**
+ * Validates verification code with Twilio Verify API service.
+ */
+export const verifyTwilioOtp = async (mobile, code) => {
+  const formattedMobile = formatE164Number(mobile);
+  const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && verifyServiceSid) {
+    const client = getTwilioClient();
+    if (client) {
+      try {
+        const check = await client.verify.v2.services(verifyServiceSid)
+          .verificationChecks
+          .create({ to: formattedMobile, code: String(code).trim() });
+
+        return {
+          success: true,
+          approved: check.status === "approved" && check.valid === true,
+          status: check.status,
+        };
+      } catch (err) {
+        console.error(`[Twilio Verification Check Error]:`, err.message || err);
+        return { success: false, approved: false, error: err.message };
+      }
+    }
+  }
+
+  return { success: false, approved: false, message: "Twilio Verify service not configured" };
 };
 
