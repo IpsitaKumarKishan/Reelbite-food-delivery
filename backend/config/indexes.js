@@ -28,6 +28,26 @@ export const ensureIndexes = async () => {
     await Item.collection.createIndex({ shop: 1, foodType: 1, category: 1 });
     await Item.collection.createIndex({ "rating.average": -1 });
     console.log("Database indexes ensured");
+
+    // Purge any orphaned shops whose owners no longer exist in User collection
+    const allShops = await Shop.find().select("_id name owner").lean();
+    const orphanedShopIds = [];
+    for (const s of allShops) {
+      if (!s.owner) {
+        orphanedShopIds.push(s._id);
+        continue;
+      }
+      const ownerExists = await User.exists({ _id: s.owner });
+      if (!ownerExists) {
+        orphanedShopIds.push(s._id);
+      }
+    }
+    if (orphanedShopIds.length > 0) {
+      await Item.deleteMany({ shop: { $in: orphanedShopIds } });
+      await Reel.deleteMany({ shop: { $in: orphanedShopIds } });
+      await Shop.deleteMany({ _id: { $in: orphanedShopIds } });
+      console.log(`Cleaned up ${orphanedShopIds.length} orphaned shop(s) with removed owners.`);
+    }
   } catch (error) {
     console.log("Database indexing notice:", error.message || error);
   }

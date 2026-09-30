@@ -7,6 +7,7 @@ import {
   updateUserRole,
   updateUserStatus,
   deleteUser,
+  deleteShop,
   getDisputesAndRefunds,
   settleShopPayout,
   getQuickBadges,
@@ -23,6 +24,7 @@ adminRouter.get("/quick-badges", getQuickBadges);
 adminRouter.get("/metrics", getPlatformMetrics);
 adminRouter.get("/shops", getAllShops);
 adminRouter.patch("/shops/:shopId/status", updateShopStatus);
+adminRouter.delete("/shops/:shopId", deleteShop);
 adminRouter.post("/shops/:shopId/settle", settleShopPayout);
 adminRouter.get("/users", getAllUsers);
 adminRouter.patch("/users/:userId/role", updateUserRole);

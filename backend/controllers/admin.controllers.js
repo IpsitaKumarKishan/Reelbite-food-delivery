@@ -2,6 +2,7 @@ import User from "../models/user.model.js";
 import Shop from "../models/shop.model.js";
 import Order from "../models/order.model.js";
 import Item from "../models/item.model.js";
+import Reel from "../models/reel.model.js";
 
 /**
  * GET /api/admin/metrics
@@ -489,19 +490,84 @@ export const deleteUser = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // If deleting an owner, suspend their shops to protect active listings
+    // If deleting an owner, cascade delete all their shops, items, and reels so they never appear in feeds
     if (targetUser.role === "owner") {
-      await Shop.updateMany({ owner: userId }, { status: "suspended" });
+      const ownerShops = await Shop.find({ owner: userId }).select("_id");
+      const shopIds = ownerShops.map((s) => s._id);
+
+      if (shopIds.length > 0) {
+        await Item.deleteMany({ shop: { $in: shopIds } });
+        await Reel.deleteMany({ $or: [{ shop: { $in: shopIds } }, { owner: userId }] });
+        await Shop.deleteMany({ owner: userId });
+      }
     }
 
     await User.findByIdAndDelete(userId);
 
+    // Run self-healing cleanup for any remaining orphaned shops
+    await cleanupOrphanedShops();
+
     return res.status(200).json({
-      message: `User ${targetUser.fullName || targetUser.email} removed successfully`,
+      message: `User ${targetUser.fullName || targetUser.email} and all associated restaurant assets removed successfully`,
       userId,
     });
   } catch (error) {
     return res.status(500).json({ message: `deleteUser error: ${error.message || error}` });
+  }
+};
+
+/**
+ * DELETE /api/admin/shops/:shopId
+ * Permanently removes a restaurant shop, its menu items, and its reels from the platform.
+ */
+export const deleteShop = async (req, res) => {
+  try {
+    const { shopId } = req.params;
+    const targetShop = await Shop.findById(shopId);
+    if (!targetShop) {
+      return res.status(404).json({ message: "Shop not found" });
+    }
+
+    await Item.deleteMany({ shop: shopId });
+    await Reel.deleteMany({ shop: shopId });
+    await Shop.findByIdAndDelete(shopId);
+
+    return res.status(200).json({
+      message: `Shop "${targetShop.name}" and all associated menu items and reels removed successfully.`,
+      shopId,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: `deleteShop error: ${error.message || error}` });
+  }
+};
+
+/**
+ * Self-healing cleanup utility: Automatically purges orphaned shops and items whose owner accounts no longer exist.
+ */
+export const cleanupOrphanedShops = async () => {
+  try {
+    const allShops = await Shop.find().select("_id name owner").lean();
+    const orphanedShopIds = [];
+
+    for (const shop of allShops) {
+      if (!shop.owner) {
+        orphanedShopIds.push(shop._id);
+        continue;
+      }
+      const ownerExists = await User.exists({ _id: shop.owner });
+      if (!ownerExists) {
+        orphanedShopIds.push(shop._id);
+      }
+    }
+
+    if (orphanedShopIds.length > 0) {
+      await Item.deleteMany({ shop: { $in: orphanedShopIds } });
+      await Reel.deleteMany({ shop: { $in: orphanedShopIds } });
+      await Shop.deleteMany({ _id: { $in: orphanedShopIds } });
+      console.log(`[Auto-Cleanup] Successfully purged ${orphanedShopIds.length} orphaned shop(s) and their menu items.`);
+    }
+  } catch (err) {
+    console.error("[Auto-Cleanup Notice]:", err.message || err);
   }
 };
 

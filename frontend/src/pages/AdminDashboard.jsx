@@ -110,6 +110,23 @@ export default function AdminDashboard() {
     }
   };
 
+  // Handler to permanently delete/remove a shop
+  const handleDeleteShop = async (shopId, shopName) => {
+    const confirmed = window.confirm(`Are you sure you want to permanently delete "${shopName}"? This will delete the restaurant listing, its menu items, and its video reels.`);
+    if (!confirmed) return;
+
+    try {
+      const res = await axios.delete(
+        `${serverUrl}/api/admin/shops/${shopId}`,
+        { withCredentials: true }
+      );
+      toast.success(res.data.message || "Shop removed successfully");
+      setShops((prev) => prev.filter((s) => s._id !== shopId));
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to delete shop");
+    }
+  };
+
   // Handler to settle shop payouts
   const handleSettlePayout = async (shopId, shopName) => {
     try {
@@ -602,6 +619,14 @@ export default function AdminDashboard() {
                               title="Settle all delivered orders for this shop"
                             >
                               Settle Payout
+                            </button>
+
+                            <button
+                              onClick={() => handleDeleteShop(shop._id, shop.name)}
+                              className="px-2.5 py-1 text-rose-600 hover:text-white hover:bg-rose-600 rounded-lg text-[11px] font-bold transition border border-rose-200 hover:border-transparent"
+                              title="Permanently remove restaurant listing and menu"
+                            >
+                              Delete
                             </button>
                           </div>
                         </td>

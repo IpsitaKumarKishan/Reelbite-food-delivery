@@ -111,41 +111,56 @@ export const deleteItem = async (req, res) => {
 
 export const getItemByCity = async (req, res) => {
     try {
-        const { city } = req.params
-        let shops = []
+        const { city } = req.params;
+        const activeFilter = {
+            status: "active",
+            isApproved: { $ne: false },
+        };
+
+        let query = { ...activeFilter };
         if (city && city !== "null" && city !== "undefined" && city !== "all") {
-            shops = await Shop.find({
-                city: { $regex: new RegExp(city, "i") }
-            }).populate('items')
+            query.city = { $regex: new RegExp(city, "i") };
         }
-        
-        if (!shops || shops.length === 0) {
-            shops = await Shop.find({}).populate('items')
+
+        let shops = await Shop.find(query).populate('owner', 'status').lean();
+
+        if ((!shops || shops.length === 0) && query.city) {
+            shops = await Shop.find(activeFilter).populate('owner', 'status').lean();
         }
-        
-        const shopIds = shops.map((shop) => shop._id)
-        const items = await Item.find({ shop: { $in: shopIds } }).populate("shop", "name image city").lean()
-        return res.status(200).json(items)
+
+        const validShopIds = (shops || [])
+            .filter((shop) => shop.owner && shop.owner.status !== "suspended")
+            .map((shop) => shop._id);
+
+        const items = await Item.find({ shop: { $in: validShopIds } })
+            .populate("shop", "name image city")
+            .lean();
+        return res.status(200).json(items);
 
     } catch (error) {
-        return res.status(500).json({ message: `get item by city error ${error}` })
+        return res.status(500).json({ message: `get item by city error ${error.message || error}` });
     }
-}
+};
 
-export const getItemsByShop=async (req,res) => {
+export const getItemsByShop = async (req, res) => {
     try {
-        const {shopId}=req.params
-        const shop=await Shop.findById(shopId).populate("items").lean()
-        if(!shop){
-            return res.status(400).json("shop not found")
+        const { shopId } = req.params;
+        const shop = await Shop.findById(shopId)
+            .populate("items")
+            .populate("owner", "status")
+            .lean();
+
+        if (!shop || shop.status === "suspended" || !shop.owner || shop.owner.status === "suspended") {
+            return res.status(404).json({ message: "Shop not found or currently unavailable" });
         }
         return res.status(200).json({
-            shop,items:shop.items
-        })
+            shop,
+            items: shop.items || []
+        });
     } catch (error) {
-         return res.status(500).json({ message: `get item by shop error ${error}` })
+        return res.status(500).json({ message: `get item by shop error ${error.message || error}` });
     }
-}
+};
 
 export const searchItems = async (req, res) => {
     try {
@@ -160,14 +175,19 @@ export const searchItems = async (req, res) => {
             sortBy
         } = req.query;
 
-        // 1. Resolve shops in the target city (or matching query by shop name)
-        let shopFilter = {};
+        // 1. Resolve active shops in the target city (or matching query by shop name)
+        let shopFilter = {
+            status: "active",
+            isApproved: { $ne: false },
+        };
         if (city) {
             shopFilter.city = { $regex: new RegExp(`^${city}$`, "i") };
         }
 
-        const shops = await Shop.find(shopFilter).select("_id name city").lean();
-        const cityShopIds = shops.map(s => s._id);
+        const shops = await Shop.find(shopFilter).populate("owner", "status").select("_id name city owner").lean();
+        const cityShopIds = shops
+            .filter((s) => s.owner && s.owner.status !== "suspended")
+            .map((s) => s._id);
 
         // Find any shops whose names match the query (e.g. searching "Dominos")
         let matchingShopIdsByName = [];
@@ -175,8 +195,10 @@ export const searchItems = async (req, res) => {
             const matchedShops = await Shop.find({
                 ...shopFilter,
                 name: { $regex: query.trim(), $options: "i" }
-            }).select("_id").lean();
-            matchingShopIdsByName = matchedShops.map(s => s._id);
+            }).populate("owner", "status").select("_id owner").lean();
+            matchingShopIdsByName = matchedShops
+                .filter((s) => s.owner && s.owner.status !== "suspended")
+                .map((s) => s._id);
         }
 
         // 2. Build Item Query
