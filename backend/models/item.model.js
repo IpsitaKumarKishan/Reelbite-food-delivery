@@ -39,6 +39,25 @@ const itemSchema = new mongoose.Schema({
         enum:["veg","non veg"],
         required:true
     },
+    tasteProfile: {
+        spiceLevel: {
+            type: String,
+            enum: ["mild", "medium", "spicy", "extra-spicy"],
+            default: "medium"
+        },
+        flavorTags: {
+            type: [String],
+            default: []
+        },
+        isJainFriendly: {
+            type: Boolean,
+            default: false
+        },
+        isVegan: {
+            type: Boolean,
+            default: false
+        }
+    },
    rating:{
     average:{type:Number,default:0},
     count:{type:Number,default:0}

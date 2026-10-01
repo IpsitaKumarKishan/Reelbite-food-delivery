@@ -54,7 +54,7 @@ export const getMealTimeSlot = (customHour = null) => {
 };
 
 /**
- * Calculates a recommendation score (0 - 100) for a food item
+ * Calculates a recommendation score (0 - 100) and tasteMatchPercent for a food item
  * @param {Object} item - Item document
  * @param {Object} user - User document
  * @param {Object} userAffinities - { categoryCounts, shopCounts } from user's past orders
@@ -62,35 +62,81 @@ export const getMealTimeSlot = (customHour = null) => {
  */
 export const calculateRecommendationScore = (item, user, userAffinities = {}, timeSlotCategories = []) => {
   let score = 0;
+  const foodPrefs = user?.foodPreferences || {};
+  const userDiet = foodPrefs.dietType || user?.dietPreference || "all";
+  const userSpice = foodPrefs.spiceLevel || "medium";
+  const userFlavors = Array.isArray(foodPrefs.flavorTags) ? foodPrefs.flavorTags : [];
+  const userAllergies = Array.isArray(foodPrefs.allergies) ? foodPrefs.allergies : [];
 
   // 1. Mandatory Diet Check
-  if (user?.dietPreference === "veg" && item.foodType !== "veg") {
+  if (userDiet === "veg" && item.foodType !== "veg") {
     return -1; // Disqualified
   }
-
-  // 2. User Explicit Onboarding Cuisines (+30 pts)
-  if (user?.preferredCuisines && user.preferredCuisines.includes(item.category)) {
-    score += 30;
+  if (userDiet === "vegan") {
+    const isItemVegan = item.tasteProfile?.isVegan || (item.foodType === "veg" && !/paneer|cheese|butter|curd|milk|ghee/i.test(item.name || ""));
+    if (!isItemVegan) return -1;
+  }
+  if (userDiet === "jain") {
+    const isItemJain = item.tasteProfile?.isJainFriendly || (item.foodType === "veg" && !/onion|garlic|potato|root/i.test(item.name || ""));
+    if (!isItemJain) return -1;
   }
 
-  // 3. Time-of-day Slot Alignment (+25 pts)
-  if (timeSlotCategories.includes(item.category)) {
+  // 1b. Allergy Safety Check: Penalize items that match user allergies
+  if (userAllergies.length > 0) {
+    const itemText = `${item.name || ""} ${item.category || ""} ${(item.tasteProfile?.flavorTags || []).join(" ")}`.toLowerCase();
+    const hasAllergen = userAllergies.some(allergy => {
+      const lower = allergy.toLowerCase();
+      if (lower === "peanuts" || lower === "nuts") return /nut|peanut|kaju|badam/i.test(itemText);
+      if (lower === "dairy") return /milk|cheese|paneer|butter|cream|curd|ghee/i.test(itemText);
+      if (lower === "gluten") return /bread|naan|roti|wheat|flour|maida/i.test(itemText);
+      return itemText.includes(lower);
+    });
+    if (hasAllergen) return -1; // Exclude allergen-conflicting dishes
+  }
+
+  // 2. User Explicit Onboarding Cuisines (+25 pts)
+  if (user?.preferredCuisines && user.preferredCuisines.includes(item.category)) {
     score += 25;
   }
 
-  // 4. Past Order Category Frequency (+20 pts max)
-  const categoryFreq = userAffinities.categoryCounts?.[item.category] || 0;
-  score += Math.min(20, categoryFreq * 5);
+  // 3. Spice Level Affinity (+20 pts)
+  const itemSpice = item.tasteProfile?.spiceLevel || "medium";
+  if (itemSpice === userSpice) {
+    score += 20;
+  } else if (
+    (userSpice === "mild" && itemSpice === "medium") ||
+    (userSpice === "extra-spicy" && itemSpice === "spicy") ||
+    (userSpice === "medium" && (itemSpice === "mild" || itemSpice === "spicy"))
+  ) {
+    score += 10;
+  }
 
-  // 5. Past Order Favorite Shop Affinity (+10 pts)
+  // 4. Flavor Tag Affinity (+15 pts max)
+  const itemFlavors = item.tasteProfile?.flavorTags || [];
+  if (userFlavors.length > 0 && itemFlavors.length > 0) {
+    const matchingFlavors = itemFlavors.filter(f => userFlavors.includes(f));
+    score += Math.min(15, matchingFlavors.length * 8);
+  }
+
+  // 5. Time-of-day Slot Alignment (+18 pts)
+  if (timeSlotCategories.includes(item.category)) {
+    score += 18;
+  }
+
+  // 6. Past Order Category Frequency (+12 pts max)
+  const categoryFreq = userAffinities.categoryCounts?.[item.category] || 0;
+  score += Math.min(12, categoryFreq * 4);
+
+  // 7. Past Order Favorite Shop Affinity (+10 pts)
   const shopIdStr = item.shop?._id ? item.shop._id.toString() : item.shop?.toString();
   if (shopIdStr && userAffinities.shopCounts?.[shopIdStr]) {
     score += Math.min(10, userAffinities.shopCounts[shopIdStr] * 3);
   }
 
-  // 6. Item Quality / Rating (+15 pts max)
+  // 8. Item Quality / Rating (+10 pts max)
   const avgRating = item.rating?.average || 4.0;
-  score += (avgRating / 5.0) * 15;
+  score += (avgRating / 5.0) * 10;
 
-  return Math.round(score);
+  return Math.min(100, Math.round(score));
 };
+

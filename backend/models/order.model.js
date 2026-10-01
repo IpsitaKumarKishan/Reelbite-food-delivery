@@ -8,8 +8,15 @@ const shopOrderItemSchema = new mongoose.Schema({
     },
     name:String,
     price:Number,
-    quantity:Number
+    quantity:Number,
+    customization: {
+        spiceLevel: { type: String, default: null },
+        cookingStyle: { type: String, default: null },
+        addons: [{ type: String }],
+        notes: { type: String, default: null }
+    }
 }, { timestamps: true })
+
 
 const shopOrderSchema = new mongoose.Schema({
     shop: {

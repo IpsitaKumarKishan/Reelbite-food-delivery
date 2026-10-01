@@ -11,7 +11,9 @@ const ReelTeaserStrip = () => {
   useEffect(() => {
     const fetchTeaserReels = async () => {
       try {
-        const res = await axios.get(`${serverUrl}/api/reels?limit=6`);
+        const res = await axios.get(`${serverUrl}/api/reels?limit=6`, {
+          withCredentials: true,
+        });
         setReels(res.data.reels || []);
       } catch (err) {
         console.error("Failed to load reel teasers:", err);
@@ -64,6 +66,14 @@ const ReelTeaserStrip = () => {
                   playsInline
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent group-hover:from-black/90 transition" />
+
+                {/* Taste Match Badge on Teaser */}
+                {reel.tasteMatchPercent && reel.tasteMatchPercent >= 75 && (
+                  <div className="absolute top-2.5 left-2.5 z-10 bg-black/70 backdrop-blur-md border border-amber-500/40 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full shadow flex items-center gap-1">
+                    <span>✨</span>
+                    <span>{reel.tasteMatchPercent}% Match</span>
+                  </div>
+                )}
 
                 {/* Play Icon */}
                 <div className="absolute inset-0 flex items-center justify-center">

@@ -76,6 +76,42 @@ export default function SearchFilterBar({
           </div>
         </div>
 
+        {/* Taste & Cravings Quick Filter Pills */}
+        <div className="w-full flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-t border-stone-100 pt-2.5">
+          <span className="text-[10px] font-black uppercase tracking-wider text-stone-400 shrink-0 mr-1 flex items-center gap-1">
+            <span>👅 Taste:</span>
+          </span>
+          {[
+            { id: "all", label: "All Flavors", icon: "✨" },
+            { id: "spicy", label: "Spicy & Fiery", icon: "🔥" },
+            { id: "cheesy", label: "Cheesy & Loaded", icon: "🧀" },
+            { id: "crispy", label: "Extra Crispy", icon: "🍗" },
+            { id: "tangy", label: "Tangy / Chatpata", icon: "🍋" },
+            { id: "creamy", label: "Rich & Creamy", icon: "🥛" },
+            { id: "smoky", label: "Smoky / Tandoori", icon: "🍖" },
+            { id: "sweet", label: "Sweet Tooth", icon: "🍯" },
+            { id: "protein", label: "High Protein", icon: "💪" },
+            { id: "light", label: "Light & Less Oil", icon: "🥗" }
+          ].map((tag) => {
+            const isSelected = (filters.tasteTag || "all") === tag.id;
+            return (
+              <button
+                key={tag.id}
+                type="button"
+                onClick={() => onFilterChange("tasteTag", tag.id)}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition shrink-0 flex items-center gap-1 border cursor-pointer ${
+                  isSelected
+                    ? "bg-[#ff5200] text-white border-[#ff5200] shadow-xs"
+                    : "bg-stone-50 text-stone-600 border-stone-200/80 hover:bg-stone-100 hover:text-stone-900"
+                }`}
+              >
+                <span>{tag.icon}</span>
+                <span>{tag.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
         {/* Right Side: Sort Dropdown & Clear */}
         <div className="flex items-center gap-2 ml-auto">
           {/* Mobile Price Select */}

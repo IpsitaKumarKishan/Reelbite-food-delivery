@@ -117,7 +117,8 @@ export const getFeedRecommendations = async (req, res) => {
     const cityShopIds = shopsInCity.map(s => s._id);
 
     const baseItemQuery = cityShopIds.length > 0 ? { shop: { $in: cityShopIds } } : {};
-    if (user.dietPreference === "veg") {
+    const userDiet = user.foodPreferences?.dietType || user.dietPreference || "all";
+    if (["veg", "vegan", "jain"].includes(userDiet)) {
       baseItemQuery.foodType = "veg";
     }
 
@@ -139,10 +140,19 @@ export const getFeedRecommendations = async (req, res) => {
       .lean();
 
     const scored = candidateItems
-      .map(item => ({
-        item,
-        score: calculateRecommendationScore(item, user, userAffinities, timeSlot.categories)
-      }))
+      .map(item => {
+        const score = calculateRecommendationScore(item, user, userAffinities, timeSlot.categories);
+        // Map raw score into a normalized match percentage (70% - 99%)
+        const tasteMatchPercent = Math.min(99, Math.max(70, Math.round(68 + (score / 100) * 31)));
+        return {
+          item: {
+            ...item,
+            tasteMatchPercent,
+            recommendationScore: score
+          },
+          score
+        };
+      })
       .filter(s => s.score >= 0)
       .sort((a, b) => b.score - a.score);
 

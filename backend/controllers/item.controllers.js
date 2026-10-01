@@ -4,7 +4,7 @@ import uploadOnCloudinary from "../utils/cloudinary.js";
 
 export const addItem = async (req, res) => {
     try {
-        const { name, category, foodType, price } = req.body
+        const { name, category, foodType, price, spiceLevel, flavorTags, isJainFriendly, isVegan } = req.body
         let image;
         if (req.file) {
             image = await uploadOnCloudinary(req.file.path)
@@ -13,8 +13,27 @@ export const addItem = async (req, res) => {
         if (!shop) {
             return res.status(400).json({ message: "shop not found" })
         }
+
+        let parsedTags = [];
+        if (Array.isArray(flavorTags)) {
+            parsedTags = flavorTags;
+        } else if (typeof flavorTags === "string" && flavorTags.trim()) {
+            try {
+                parsedTags = JSON.parse(flavorTags);
+            } catch (e) {
+                parsedTags = flavorTags.split(",").map(t => t.trim()).filter(Boolean);
+            }
+        }
+
+        const tasteProfile = {
+            spiceLevel: spiceLevel || "medium",
+            flavorTags: parsedTags,
+            isJainFriendly: isJainFriendly === "true" || isJainFriendly === true,
+            isVegan: isVegan === "true" || isVegan === true
+        };
+
         const item = await Item.create({
-            name, category, foodType, price, image, shop: shop._id
+            name, category, foodType, price, image, shop: shop._id, tasteProfile
         })
 
         shop.items.push(item._id)
@@ -34,7 +53,7 @@ export const addItem = async (req, res) => {
 export const editItem = async (req, res) => {
     try {
         const itemId = req.params.itemId
-        const { name, category, foodType, price } = req.body
+        const { name, category, foodType, price, spiceLevel, flavorTags, isJainFriendly, isVegan } = req.body
 
         const item = await Item.findById(itemId)
         if (!item) {
@@ -53,6 +72,26 @@ export const editItem = async (req, res) => {
             if (uploadedUrl) {
                 updateData.image = uploadedUrl
             }
+        }
+
+        if (spiceLevel || flavorTags !== undefined || isJainFriendly !== undefined || isVegan !== undefined) {
+            let parsedTags = item.tasteProfile?.flavorTags || [];
+            if (Array.isArray(flavorTags)) {
+                parsedTags = flavorTags;
+            } else if (typeof flavorTags === "string" && flavorTags.trim()) {
+                try {
+                    parsedTags = JSON.parse(flavorTags);
+                } catch (e) {
+                    parsedTags = flavorTags.split(",").map(t => t.trim()).filter(Boolean);
+                }
+            }
+
+            updateData.tasteProfile = {
+                spiceLevel: spiceLevel || item.tasteProfile?.spiceLevel || "medium",
+                flavorTags: parsedTags,
+                isJainFriendly: isJainFriendly !== undefined ? (isJainFriendly === "true" || isJainFriendly === true) : (item.tasteProfile?.isJainFriendly || false),
+                isVegan: isVegan !== undefined ? (isVegan === "true" || isVegan === true) : (item.tasteProfile?.isVegan || false)
+            };
         }
 
         await Item.findByIdAndUpdate(itemId, updateData, { new: true })

@@ -60,6 +60,26 @@ function UserOrderCard({ data }) {
                                 <img src={item.item.image} alt="" className='w-full h-24 object-cover rounded' />
                                 <p className='text-sm font-semibold mt-1'>{item.name}</p>
                                 <p className='text-xs text-gray-500'>Qty: {item.quantity} x ₹{item.price}</p>
+                                {item.customization && (
+                                    <div className="mt-1 flex flex-wrap gap-1">
+                                        {item.customization.spiceLevel && (
+                                            <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-orange-100 text-orange-800">
+                                                🌶️ {item.customization.spiceLevel}
+                                            </span>
+                                        )}
+                                        {item.customization.cookingStyle && (
+                                            <span className="text-[9px] font-semibold px-1 py-0.5 rounded bg-gray-100 text-gray-700">
+                                                {item.customization.cookingStyle}
+                                            </span>
+                                        )}
+                                        {item.customization.notes && (
+                                            <p className="text-[9px] text-gray-500 italic truncate w-full">
+                                                "{item.customization.notes}"
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
 
                                 {shopOrder.status == "delivered" && <div className='flex space-x-1 mt-2'>
                                     {[1, 2, 3, 4, 5].map((star) => (

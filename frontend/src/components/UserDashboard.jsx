@@ -9,11 +9,13 @@ import useGetRecommendations from '../hooks/useGetRecommendations';
 import OrderAgainCarousel from './OrderAgainCarousel';
 import TimeSlotCarousel from './TimeSlotCarousel';
 import SearchFilterBar from './SearchFilterBar';
+import FoodPreferencesModal from './modals/FoodPreferencesModal';
 
 function UserDashboard() {
   const { currentCity, shopInMyCity, itemsInMyCity, searchItems, userData } = useSelector(state => state.user);
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState("All");
+  const [isTasteModalOpen, setIsTasteModalOpen] = useState(false);
 
   // Hook for personalized recommendations (Order Again & Time of Day)
   const { orderAgain, timeSlot, forYou } = useGetRecommendations();
@@ -23,6 +25,7 @@ function UserDashboard() {
     vegOnly: userData?.dietPreference === "veg",
     minRating: null,
     priceBracket: "all",
+    tasteTag: "all",
     sortBy: "relevance"
   });
 
@@ -42,6 +45,7 @@ function UserDashboard() {
       vegOnly: userData?.dietPreference === "veg",
       minRating: null,
       priceBracket: "all",
+      tasteTag: "all",
       sortBy: "relevance"
     });
     setActiveCategory("All");
@@ -52,10 +56,12 @@ function UserDashboard() {
       (filters.vegOnly && userData?.dietPreference !== "veg") ||
       filters.minRating !== null ||
       filters.priceBracket !== "all" ||
+      (filters.tasteTag && filters.tasteTag !== "all") ||
       filters.sortBy !== "relevance" ||
       activeCategory !== "All"
     );
   }, [filters, activeCategory, userData?.dietPreference]);
+
 
   // Compute filtered & sorted items
   const filteredItems = useMemo(() => {
@@ -69,6 +75,49 @@ function UserDashboard() {
     // Pure Veg filter
     if (filters.vegOnly) {
       list = list.filter(i => i.foodType === "veg");
+    }
+
+    // Taste & Craving Tag filter
+    if (filters.tasteTag && filters.tasteTag !== "all") {
+      list = list.filter(i => {
+        const itemFlavorTags = (i.tasteProfile?.flavorTags || []).map(t => t.toLowerCase());
+        const itemSpice = (i.tasteProfile?.spiceLevel || "").toLowerCase();
+        const itemText = `${i.name || ""} ${i.category || ""}`.toLowerCase();
+
+        switch (filters.tasteTag) {
+          case "spicy":
+            return ["spicy", "extra-spicy"].includes(itemSpice) ||
+              itemFlavorTags.some(t => t.includes("spicy") || t.includes("masala") || t.includes("fiery")) ||
+              /spicy|chilli|mirch|masala|schezwan|tikka|peri peri|tadka|curry/i.test(itemText);
+          case "cheesy":
+            return itemFlavorTags.some(t => t.includes("cheesy") || t.includes("cheese")) ||
+              /cheese|cheesy|mozzarella|pizza|burger|fondue/i.test(itemText);
+          case "crispy":
+            return itemFlavorTags.some(t => t.includes("crispy") || t.includes("crunchy")) ||
+              /crisp|crispy|fried|fry|crunchy|pakoda|nugget|roast|dosa/i.test(itemText);
+          case "tangy":
+            return itemFlavorTags.some(t => t.includes("tangy") || t.includes("chatpata")) ||
+              /tangy|chatpata|chaat|lemon|chutney|pani puri|sev|kachori|samosa/i.test(itemText);
+          case "creamy":
+            return itemFlavorTags.some(t => t.includes("creamy") || t.includes("makhani")) ||
+              /cream|creamy|malai|makhani|butter|paneer butter|korma|gravy/i.test(itemText);
+          case "smoky":
+            return itemFlavorTags.some(t => t.includes("smoky") || t.includes("tandoori")) ||
+              /tandoor|tandoori|smoky|barbeque|bbq|tikka|kebab|charcoal/i.test(itemText);
+          case "sweet":
+            return ["desserts", "sweets", "bakery", "beverages"].includes((i.category || "").toLowerCase()) ||
+              itemFlavorTags.some(t => t.includes("sweet")) ||
+              /sweet|cake|ice cream|shake|halwa|gulab jamun|brownie|dessert|chocolate/i.test(itemText);
+          case "protein":
+            return itemFlavorTags.some(t => t.includes("protein")) ||
+              /protein|paneer|chicken|egg|fish|soya|tofu|dal|mutton/i.test(itemText);
+          case "light":
+            return itemFlavorTags.some(t => t.includes("light")) ||
+              /salad|soup|khichdi|steamed|idli|sprouts|boiled|plain/i.test(itemText);
+          default:
+            return true;
+        }
+      });
     }
 
     // Min Rating filter
@@ -97,6 +146,40 @@ function UserDashboard() {
     return list;
   }, [itemsInMyCity, activeCategory, filters]);
 
+  // Compute curated palate items (combines backend forYou or client heuristic scoring)
+  const curatedPalateItems = useMemo(() => {
+    if (forYou && forYou.length > 0) return forYou;
+    if (!itemsInMyCity || itemsInMyCity.length === 0) return [];
+
+    const userPrefs = userData?.foodPreferences || {};
+    const userDiet = userPrefs.dietType || userData?.dietPreference || "all";
+    const userSpice = userPrefs.spiceLevel || "medium";
+    const userFlavors = Array.isArray(userPrefs.flavorTags) ? userPrefs.flavorTags : [];
+
+    let candidates = [...itemsInMyCity];
+    if (["veg", "vegan", "jain"].includes(userDiet)) {
+      candidates = candidates.filter(i => i.foodType === "veg");
+    }
+
+    return candidates
+      .map(item => {
+        let affinity = 72;
+        const itemSpice = item.tasteProfile?.spiceLevel || "medium";
+        if (itemSpice === userSpice) affinity += 14;
+        const itemFlavors = item.tasteProfile?.flavorTags || [];
+        const matches = itemFlavors.filter(f => userFlavors.includes(f));
+        affinity += Math.min(10, matches.length * 5);
+        const rating = item.rating?.average || 4.0;
+        affinity += Math.round((rating / 5) * 4);
+        return {
+          ...item,
+          tasteMatchPercent: Math.min(99, affinity)
+        };
+      })
+      .sort((a, b) => (b.tasteMatchPercent || 0) - (a.tasteMatchPercent || 0))
+      .slice(0, 8);
+  }, [forYou, itemsInMyCity, userData]);
+
   // Compute filtered shops
   const filteredShops = useMemo(() => {
     let shops = shopInMyCity ? [...shopInMyCity] : [];
@@ -107,6 +190,7 @@ function UserDashboard() {
 
     return shops;
   }, [shopInMyCity, filters.minRating]);
+
 
   return (
     <div className='w-full min-h-screen flex flex-col bg-[#f8f9fa] text-stone-900 font-sans pb-28 md:pb-12'>
@@ -141,17 +225,55 @@ function UserDashboard() {
           <TimeSlotCarousel timeSlot={timeSlot} />
         )}
 
+        {/* Module 1.3: Curated For Your Palate (Taste & Preference Matched) */}
+        {curatedPalateItems && curatedPalateItems.length > 0 && (
+          <section className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10 border border-orange-200/80 p-4 sm:p-6 rounded-3xl space-y-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xl">🎯</span>
+                  <h2 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight">
+                    Curated For Your Palate
+                  </h2>
+                  {userData?.foodPreferences?.spiceLevel && (
+                    <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-white text-stone-800 border border-stone-200 shadow-xs flex items-center gap-1">
+                      <span>{userData.foodPreferences.spiceLevel === "extra-spicy" ? "🔥" : userData.foodPreferences.spiceLevel === "spicy" ? "🌶️" : "🟡"}</span>
+                      <span className="capitalize">{userData.foodPreferences.spiceLevel}</span>
+                    </span>
+                  )}
+                  {userData?.foodPreferences?.dietType && userData.foodPreferences.dietType !== "all" && (
+                    <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      🌱 {userData.foodPreferences.dietType.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-stone-600 font-medium mt-0.5">
+                  Dishes handpicked to match your saved taste profile, diet choices & preferred spices
+                </p>
+              </div>
+              <button
+                onClick={() => setIsTasteModalOpen(true)}
+                className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-white hover:bg-stone-50 text-stone-800 border border-stone-300 shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>⚙️</span>
+                <span>Tune Palate</span>
+              </button>
+            </div>
+
+            {/* Horizontal Scroll Carousel */}
+            <div className="flex items-stretch gap-4 overflow-x-auto pb-2 pt-1 scrollbar-thin">
+              {curatedPalateItems.map((item) => (
+                <div key={item._id} className="shrink-0 w-[240px] sm:w-[260px]">
+                  <FoodCard data={item} />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Reels Near You Strip */}
         <ReelTeaserStrip />
 
-        {/* Module 1.2: Faceted Filter Toolbar */}
-        <SearchFilterBar
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          onResetFilters={handleResetFilters}
-          hasActiveFilters={hasActiveFilters}
-          itemCount={filteredItems.length}
-        />
 
         {/* Restaurant Listing Section */}
         <section className="space-y-4">
@@ -180,6 +302,16 @@ function UserDashboard() {
             )}
           </div>
         </section>
+
+        {/* Module 1.2: Faceted Filter Toolbar */}
+        <SearchFilterBar
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onResetFilters={handleResetFilters}
+          hasActiveFilters={hasActiveFilters}
+          itemCount={filteredItems.length}
+        />
+
 
         {/* Popular Dishes / Filtered Food Grid Section */}
         <section className="space-y-4 pt-4 border-t border-stone-200">
@@ -214,8 +346,15 @@ function UserDashboard() {
           </div>
         </section>
       </main>
+
+      {/* Food Preferences Modal */}
+      <FoodPreferencesModal
+        isOpen={isTasteModalOpen}
+        onClose={() => setIsTasteModalOpen(false)}
+      />
     </div>
   );
 }
 
 export default UserDashboard;
+

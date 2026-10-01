@@ -363,6 +363,19 @@ const ReelCard = ({ reel, currentUser, onSkip, onImpression, isMuted, setIsMuted
         </div>
       )}
 
+      {/* Taste Match Badge */}
+      {reel.tasteMatchPercent && reel.tasteMatchPercent >= 70 && (
+        <div className="absolute top-4 left-4 z-20 flex items-center gap-1.5 bg-black/60 backdrop-blur-md border border-amber-500/40 text-amber-300 px-3 py-1.5 rounded-full text-[11px] font-black shadow-lg">
+          <span>✨</span>
+          <span>{reel.tasteMatchPercent}% Taste Match</span>
+          {reel.tasteMatchBadges?.[0] && (
+            <span className="bg-amber-500/20 text-white text-[9px] px-1.5 py-0.5 rounded-full border border-amber-400/30">
+              {reel.tasteMatchBadges[0]}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Sound / Volume Toggle Button */}
       <button
         onClick={() => setIsMuted(!isMuted)}
@@ -476,9 +489,21 @@ const ReelCard = ({ reel, currentUser, onSkip, onImpression, isMuted, setIsMuted
                     {reel.foodItem.name}
                   </h4>
                 </div>
-                <p className="text-[#ff5200] font-black text-xs">
-                  ₹{reel.foodItem.price}
-                </p>
+                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                  <p className="text-[#ff5200] font-black text-xs">
+                    ₹{reel.foodItem.price}
+                  </p>
+                  {reel.foodItem.tasteProfile?.spiceLevel && (
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">
+                      {reel.foodItem.tasteProfile.spiceLevel === "extra-spicy" ? "🔥 Fiery" : reel.foodItem.tasteProfile.spiceLevel === "spicy" ? "🌶️ Spicy" : "🟢 Mild"}
+                    </span>
+                  )}
+                  {reel.foodItem.tasteProfile?.flavorTags?.slice(0, 1).map((tag) => (
+                    <span key={tag} className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-stone-200 border border-white/15">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -530,6 +555,7 @@ const Reels = () => {
   const [direction, setDirection] = useState(0);
   // Reel sounds always on by default (unmuted)
   const [isMuted, setIsMuted] = useState(false);
+  const [tasteFilter, setTasteFilter] = useState("all");
 
   // Onboarding modal: shown to logged-in users whose preferredCuisines is empty.
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -710,12 +736,24 @@ const Reels = () => {
     }
   }, [currentIndex, reels.length, hasMore]);
 
+  const handleTasteFilterChange = (filterId) => {
+    setTasteFilter(filterId);
+    seenIdsRef.current = new Set();
+    skippedCategoryMapRef.current = {};
+    setReels([]);
+    setCurrentIndex(0);
+    setCurrentPage(1);
+    setHasMore(true);
+    fetchReels(1, true, filterId);
+  };
+
   /**
    * Fetches one page of reels, appending to the existing feed.
    * @param {number} page          - 1-indexed page number
    * @param {boolean} isReset      - true on first load / filter change
+   * @param {string} activeFilter  - active taste filter
    */
-  const fetchReels = async (page = 1, isReset = false) => {
+  const fetchReels = async (page = 1, isReset = false, activeFilter = tasteFilter) => {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
 
@@ -738,6 +776,7 @@ const Reels = () => {
         limit: 10,
         city: currentCity || "",
       };
+      if (activeFilter && activeFilter !== "all") params.tasteFilter = activeFilter;
       if (excludeIds) params.excludeIds = excludeIds;
       if (penalizedCategories) params.penalizedCategories = penalizedCategories;
 
@@ -787,9 +826,26 @@ const Reels = () => {
           <span>Home</span>
         </button>
 
-        <div className="hidden sm:flex items-center gap-2 pointer-events-none bg-black/40 px-3.5 py-1 rounded-full border border-white/10 text-xs font-semibold text-stone-300">
-          <span className="w-2 h-2 rounded-full bg-[#ff5200] animate-pulse"></span>
-          <span>Reelbite Shorts</span>
+        {/* Interactive Taste Filters Strip */}
+        <div className="pointer-events-auto flex items-center gap-1 bg-black/60 p-1 rounded-full backdrop-blur-md border border-white/10 shadow-lg">
+          {[
+            { id: "all", label: "All" },
+            { id: "my_taste", label: "🎯 My Taste" },
+            { id: "spicy", label: "🔥 Spicy" },
+            { id: "veg", label: "🌱 Veg" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => handleTasteFilterChange(tab.id)}
+              className={`px-3 py-1 rounded-full text-[11px] font-bold transition cursor-pointer ${
+                tasteFilter === tab.id
+                  ? "bg-[#ff5200] text-white shadow-xs"
+                  : "text-stone-300 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {userData?.role === "owner" ? (
@@ -801,7 +857,7 @@ const Reels = () => {
             <span>Upload</span>
           </button>
         ) : (
-          <div className="w-12" />
+          <div className="w-12 hidden sm:block" />
         )}
       </div>
 

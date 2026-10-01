@@ -50,6 +50,31 @@ const dispatch=useDispatch()
                         <img src={item.item.image} alt="" className='w-full h-24 object-cover rounded' />
                         <p className='text-sm font-semibold mt-1'>{item.name}</p>
                         <p className='text-xs text-gray-500'>Qty: {item.quantity} x ₹{item.price}</p>
+                        {item.customization && (
+                            <div className="mt-1 flex flex-wrap gap-1 bg-amber-50 p-1.5 rounded border border-amber-200">
+                                {item.customization.spiceLevel && (
+                                    <span className="text-[9px] font-bold text-red-700">
+                                        🌶️ {item.customization.spiceLevel}
+                                    </span>
+                                )}
+                                {item.customization.cookingStyle && (
+                                    <span className="text-[9px] font-medium text-stone-700">
+                                        • {item.customization.cookingStyle}
+                                    </span>
+                                )}
+                                {Array.isArray(item.customization.addons) && item.customization.addons.length > 0 && (
+                                    <span className="text-[9px] font-medium text-emerald-700 w-full">
+                                        + {item.customization.addons.join(", ")}
+                                    </span>
+                                )}
+                                {item.customization.notes && (
+                                    <p className="text-[9px] text-amber-900 font-semibold italic truncate w-full">
+                                        Note: "{item.customization.notes}"
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
                     </div>
                 ))}
             </div>

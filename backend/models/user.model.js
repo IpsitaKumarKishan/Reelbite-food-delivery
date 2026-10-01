@@ -58,13 +58,40 @@ coordinates:{type:[Number],default:[0,0]}
    cart: [
      {
        item: { type: mongoose.Schema.Types.ObjectId, ref: "Item", required: true },
-       quantity: { type: Number, default: 1, min: 1 }
+       quantity: { type: Number, default: 1, min: 1 },
+       customization: {
+         spiceLevel: { type: String, default: null },
+         cookingStyle: { type: String, default: null },
+         addons: [{ type: String }],
+         notes: { type: String, default: null },
+         extraPrice: { type: Number, default: 0 }
+       }
      }
    ],
    dietPreference: {
      type: String,
      enum: ["veg", "all"],
      default: "all"
+   },
+   foodPreferences: {
+     dietType: {
+       type: String,
+       enum: ["all", "veg", "vegan", "jain", "eggetarian"],
+       default: "all"
+     },
+     spiceLevel: {
+       type: String,
+       enum: ["mild", "medium", "spicy", "extra-spicy"],
+       default: "medium"
+     },
+     flavorTags: {
+       type: [String],
+       default: []
+     },
+     allergies: {
+       type: [String],
+       default: []
+     }
    },
    // Cuisine categories the user explicitly selected during onboarding.
    // Empty array = user skipped onboarding; cold-start falls through to

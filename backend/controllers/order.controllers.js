@@ -81,7 +81,8 @@ export const placeOrder = async (req, res) => {
                 price: verifiedPrice,
                 quantity: verifiedQty,
                 image: dbItem.image,
-                shop: shopId
+                shop: shopId,
+                customization: item.customization || null
             });
         }
 
@@ -117,11 +118,13 @@ export const placeOrder = async (req, res) => {
                     item: i.id,
                     price: i.price,
                     quantity: i.quantity,
-                    name: i.name
+                    name: i.name,
+                    customization: i.customization || null
                 }))
             }
         }
         ))
+
 
         const calculatedSplit = computeOrderSplit({ shopOrders }, shopCommissionRates);
 

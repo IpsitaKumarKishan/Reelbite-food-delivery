@@ -13,9 +13,11 @@ import { useNavigate } from 'react-router-dom';
 import CuisinePreferencesModal from './modals/CuisinePreferencesModal';
 import ProfileSettingsModal from './modals/ProfileSettingsModal';
 import SavedAddressesModal from './modals/SavedAddressesModal';
+import FoodPreferencesModal from './modals/FoodPreferencesModal';
 import NotificationDropdown from './NotificationDropdown';
 import { useNotifications } from '../context/NotificationContext';
 import { useSocket } from '../context/SocketContext';
+import { GiChiliPepper } from "react-icons/gi";
 
 function Nav() {
     const { userData, currentCity, cartItems } = useSelector(state => state.user);
@@ -27,6 +29,7 @@ function Nav() {
     const [showNotifications, setShowNotifications] = useState(false);
     const [query, setQuery] = useState("");
     const [showCuisineModal, setShowCuisineModal] = useState(false);
+    const [showFoodPreferencesModal, setShowFoodPreferencesModal] = useState(false);
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [showAddressesModal, setShowAddressesModal] = useState(false);
     const [adminBadges, setAdminBadges] = useState({
@@ -532,13 +535,28 @@ function Nav() {
                                         </div>
 
                                         <div
+                                            className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center justify-between transition group'
+                                            onClick={() => { setShowInfo(false); setShowFoodPreferencesModal(true); }}
+                                        >
+                                            <div className='flex items-center gap-2.5'>
+                                                <div className='w-7 h-7 rounded-xl bg-orange-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
+                                                    <GiChiliPepper size={14} />
+                                                </div>
+                                                <span>Taste & Food Preferences</span>
+                                            </div>
+                                            <span className='text-[10px] font-black text-[#ff5200] bg-orange-100/80 px-2 py-0.5 rounded-full capitalize'>
+                                                {userData?.foodPreferences?.spiceLevel ? `${userData.foodPreferences.spiceLevel}` : "Customize"}
+                                            </span>
+                                        </div>
+
+                                        <div
                                             className='text-xs font-bold text-stone-700 hover:text-[#ff5200] hover:bg-stone-50 rounded-2xl px-2.5 py-2 cursor-pointer flex items-center gap-2.5 transition group'
                                             onClick={() => { setShowInfo(false); setShowCuisineModal(true); }}
                                         >
                                             <div className='w-7 h-7 rounded-xl bg-stone-100 group-hover:bg-[#ff5200] group-hover:text-white text-[#ff5200] flex items-center justify-center transition shrink-0'>
                                                 <FaUtensils size={12} />
                                             </div>
-                                            <span>Food Preferences</span>
+                                            <span>Cuisine Categories</span>
                                         </div>
 
                                         <div
@@ -593,6 +611,10 @@ function Nav() {
         <CuisinePreferencesModal
             isOpen={showCuisineModal}
             onClose={() => setShowCuisineModal(false)}
+        />
+        <FoodPreferencesModal
+            isOpen={showFoodPreferencesModal}
+            onClose={() => setShowFoodPreferencesModal(false)}
         />
         <ProfileSettingsModal
             isOpen={showProfileModal}

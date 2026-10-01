@@ -45,7 +45,8 @@ const userSlice = createSlice({
         id: String(i.id || i._id || (i.item && (i.item._id || i.item)) || ""),
         _id: String(i._id || i.id || (i.item && (i.item._id || i.item)) || ""),
         price: Number(i.price) || 0,
-        quantity: Number(i.quantity) || 1
+        quantity: Number(i.quantity) || 1,
+        customization: i.customization || null
       }))
       state.totalAmount = state.cartItems.reduce((sum, i) => sum + (i.price || 0) * (i.quantity || 0), 0)
     },
@@ -57,7 +58,8 @@ const userSlice = createSlice({
           _id: String(i._id || i.id || (i.item && (i.item._id || i.item)) || ""),
           price: Number(i.price) || 0,
           quantity: Number(i.quantity) || 1,
-          shop: i.shop?._id || i.shop || null
+          shop: i.shop?._id || i.shop || null,
+          customization: i.customization || null
         }))
       } else if (action.payload) {
         const rawId = action.payload.id || action.payload._id || (action.payload.item && (action.payload.item._id || action.payload.item)) || ""
@@ -77,19 +79,24 @@ const userSlice = createSlice({
           _id: String(rawId),
           shop: newShopId,
           price: Number(action.payload.price) || 0,
-          quantity: Number(action.payload.quantity) || 1
+          quantity: Number(action.payload.quantity) || 1,
+          customization: action.payload.customization || null
         }
         const existingIndex = state.cartItems.findIndex(
           i => (i.id && i.id === cartItem.id) || (i._id && i._id === cartItem._id)
         )
         if (existingIndex > -1) {
           state.cartItems[existingIndex].quantity += cartItem.quantity
+          if (cartItem.customization) {
+            state.cartItems[existingIndex].customization = cartItem.customization
+          }
         } else {
           state.cartItems.push(cartItem)
         }
       }
       state.totalAmount = state.cartItems.reduce((sum, i) => sum + (i.price || 0) * (i.quantity || 0), 0)
     },
+
 
     setTotalAmount: (state, action) => {
       state.totalAmount = action.payload
@@ -192,9 +199,21 @@ const userSlice = createSlice({
       if (state.userData) {
         state.userData.preferredCuisines = action.payload
       }
+    },
+
+    updateUserFoodPreferences: (state, action) => {
+      if (state.userData) {
+        state.userData.foodPreferences = {
+          ...(state.userData.foodPreferences || {}),
+          ...action.payload
+        };
+        if (action.payload?.dietType) {
+          state.userData.dietPreference = ["veg", "vegan", "jain"].includes(action.payload.dietType) ? "veg" : "all";
+        }
+      }
     }
   }
 })
 
-export const { setUserData, setAuthChecked, setCurrentAddress, setCurrentCity, setCurrentState, setShopsInMyCity, setItemsInMyCity, setCartItems, addToCart, updateQuantity, removeCartItem, clearCart, setMyOrders, addMyOrder, updateOrderStatus, setSearchItems, setTotalAmount, updateRealtimeOrderStatus, updateUserDietPreference, updateUserPreferredCuisines } = userSlice.actions
+export const { setUserData, setAuthChecked, setCurrentAddress, setCurrentCity, setCurrentState, setShopsInMyCity, setItemsInMyCity, setCartItems, addToCart, updateQuantity, removeCartItem, clearCart, setMyOrders, addMyOrder, updateOrderStatus, setSearchItems, setTotalAmount, updateRealtimeOrderStatus, updateUserDietPreference, updateUserPreferredCuisines, updateUserFoodPreferences } = userSlice.actions
 export default userSlice.reducer

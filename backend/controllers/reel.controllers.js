@@ -99,7 +99,7 @@ export const createReel = async (req, res) => {
     const populatedReel = await Reel.findById(newReel._id)
       .populate("owner", "fullName email")
       .populate("shop", "name city image")
-      .populate("foodItem", "name price image category foodType");
+      .populate("foodItem", "name price image category foodType tasteProfile");
 
     return res.status(201).json({
       message: "Reel created successfully",
@@ -127,7 +127,7 @@ export const getAllReels = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const { city, excludeIds, penalizedCategories } = req.query;
+    const { city, excludeIds, penalizedCategories, tasteFilter = "all" } = req.query;
 
     // Parse session-dedup and skip-penalty params (both fully optional)
     const excludeIdSet = excludeIds
@@ -146,6 +146,25 @@ export const getAllReels = async (req, res) => {
       } catch (e) {}
     }
 
+    // Retrieve user food preferences if authenticated
+    let userDietType = "all";
+    let userSpiceLevel = "medium";
+    let userFlavorTags = [];
+    let userAllergies = [];
+    let preferredCuisines = [];
+
+    if (userId) {
+      const userDoc = await User.findById(userId).select("foodPreferences dietPreference preferredCuisines").lean();
+      if (userDoc) {
+        const userFoodPrefs = userDoc.foodPreferences || {};
+        userDietType = userFoodPrefs.dietType || userDoc.dietPreference || "all";
+        userSpiceLevel = userFoodPrefs.spiceLevel || "medium";
+        userFlavorTags = Array.isArray(userFoodPrefs.flavorTags) ? userFoodPrefs.flavorTags : [];
+        userAllergies = Array.isArray(userFoodPrefs.allergies) ? userFoodPrefs.allergies : [];
+        preferredCuisines = Array.isArray(userDoc.preferredCuisines) ? userDoc.preferredCuisines : [];
+      }
+    }
+
     const reelQuery = {};
 
     // 1. HARD FILTER: Location filter by city (reusing city marketplace logic)
@@ -158,10 +177,8 @@ export const getAllReels = async (req, res) => {
     }
 
     // Fetch candidate pool passing hard location filter (capped at 150 most recent candidates for memory protection)
-    // excludeIds: $nin filter to avoid showing already-seen reels in this session.
     const reelFindQuery = { ...reelQuery };
     if (excludeIdSet.size > 0) {
-      // Convert string IDs to ObjectIds via Mongoose's cast
       reelFindQuery._id = { $nin: Array.from(excludeIdSet) };
     }
     const candidateReels = await Reel.find(reelFindQuery)
@@ -169,11 +186,42 @@ export const getAllReels = async (req, res) => {
       .limit(150)
       .populate("owner", "fullName email")
       .populate("shop", "name city image")
-      .populate("foodItem", "name price image category foodType rating shop");
+      .populate("foodItem", "name price image category foodType tasteProfile rating shop");
+
+    // 2. HARD DIETARY FILTERING (Guarantees user lifestyle rules)
+    let filteredCandidates = candidateReels.filter((reel) => {
+      const item = reel.foodItem;
+      if (!item) return false;
+
+      const isNonVeg = item.foodType === "non veg";
+
+      // Override if specific taste filter tab is selected
+      if (tasteFilter === "veg" && isNonVeg) return false;
+      if (tasteFilter === "spicy") {
+        const itemSpice = item.tasteProfile?.spiceLevel || "medium";
+        const isSpicy = itemSpice === "spicy" || itemSpice === "extra-spicy" || /spicy|chili|schezwan|fiery|peri-peri|tikka|masala|hot/i.test(item.name || "");
+        if (!isSpicy) return false;
+      }
+
+      // Hard filter based on user's saved dietary preferences
+      if (userDietType === "veg" && isNonVeg) return false;
+      if (userDietType === "vegan") {
+        if (isNonVeg) return false;
+        if (item.tasteProfile?.isVegan === false) return false;
+      }
+      if (userDietType === "jain") {
+        if (isNonVeg) return false;
+        if (item.tasteProfile?.isJainFriendly === false) return false;
+      }
+
+      return true;
+    });
+
+    if (filteredCandidates.length === 0 && candidateReels.length > 0 && userDietType === "all") {
+      filteredCandidates = candidateReels;
+    }
 
     // 3. AFFINITY SCORE: Compute user interest profile from recent interaction history
-    //    Time-decay: multiply each interaction's weight by exp(-ageInDays / halfLifeDays)
-    //    so that older interactions contribute less to affinity than recent ones.
     const categoryAffinity = {};
     const shopAffinity = {};
     let hasSufficientHistory = false;
@@ -201,15 +249,12 @@ export const getAllReels = async (req, res) => {
           const category = inter.reel?.foodItem?.category;
           const shopIdStr = inter.reel?.shop?._id?.toString() || inter.reel?.shop?.toString();
 
-          // Base interaction weight
           let weight = IW.default;
           if (inter.addedToCart) weight = IW.addedToCart;
           else if (inter.liked || inter.shared) weight = IW.likedOrShared;
           else if (inter.watchPercentage > WT.high) weight = IW.highWatch;
           else if (inter.skipped || inter.watchPercentage < WT.low) weight = IW.negativeSignal;
 
-          // Time-decay: more recent interactions carry their full weight;
-          // interactions from HALF_LIFE_DAYS ago carry ~37% of original weight.
           const ageInDays = (nowMs - new Date(inter.createdAt).getTime()) / (1000 * 60 * 60 * 24);
           const decayFactor = Math.exp(-ageInDays / DC.halfLifeDays);
           const decayedWeight = weight * decayFactor;
@@ -222,8 +267,6 @@ export const getAllReels = async (req, res) => {
           }
         });
 
-        // Exposure Normalization: normalize raw affinities by impression counts
-        // to prevent frequently-shown categories from dominating over genuinely preferred ones.
         const { exposure: EXP_NORM } = RECOMMENDATION_WEIGHTS;
         const recentImpressions = await Impression.find({ user: userId })
           .sort({ shownAt: -1 })
@@ -246,13 +289,11 @@ export const getAllReels = async (req, res) => {
 
           const smoothingK = EXP_NORM?.smoothingK || 5;
 
-          // Normalize categoryAffinity
           Object.keys(categoryAffinity).forEach((cat) => {
             const count = categoryImpressionCount[cat] || 0;
             categoryAffinity[cat] = categoryAffinity[cat] / (count + smoothingK);
           });
 
-          // Normalize shopAffinity
           Object.keys(shopAffinity).forEach((shopKey) => {
             const count = shopImpressionCount[shopKey] || 0;
             shopAffinity[shopKey] = shopAffinity[shopKey] / (count + smoothingK);
@@ -261,30 +302,21 @@ export const getAllReels = async (req, res) => {
       }
     }
 
-    // 4. COMPOSITE SCORING (Affinity + Popularity + Recency)
+    // 4. COMPOSITE SCORING (Affinity + Popularity + Recency + Taste Match Boost)
     const { affinity: AF, popularity: POP, recency: REC, finalScore: FS } = RECOMMENDATION_WEIGHTS;
 
-    // 3b. PREFERENCE SEED (cold-start only)
-    //     If the user has no real interaction history but did set preferred
-    //     cuisines during onboarding, seed categoryAffinity with a modest
-    //     fixed value so those categories rank above unrelated reels.
-    //     Users who skipped onboarding (preferredCuisines=[]) are unaffected.
     let hasPreferenceSeed = false;
-    if (!hasSufficientHistory && userId) {
-      const userDoc = await User.findById(userId).select("preferredCuisines").lean();
-      const prefs = userDoc?.preferredCuisines || [];
-      if (prefs.length > 0) {
-        prefs.forEach((cat) => {
-          if (cat) {
-            categoryAffinity[cat] = (categoryAffinity[cat] || 0) + FS.coldStart.preferenceSeed;
-          }
-        });
-        hasPreferenceSeed = true;
-      }
+    if (!hasSufficientHistory && preferredCuisines.length > 0) {
+      preferredCuisines.forEach((cat) => {
+        if (cat) {
+          categoryAffinity[cat] = (categoryAffinity[cat] || 0) + FS.coldStart.preferenceSeed;
+        }
+      });
+      hasPreferenceSeed = true;
     }
 
     const now = Date.now();
-    const scoredReels = candidateReels.map((reel) => {
+    const scoredReels = filteredCandidates.map((reel) => {
       const category = reel.foodItem?.category;
       const shopIdStr = reel.shop?._id?.toString();
 
@@ -301,43 +333,131 @@ export const getAllReels = async (req, res) => {
 
       let finalScore = 0;
       if (hasSufficientHistory) {
-        // Full personalized scoring (interaction history)
         finalScore =
           affinityScore * FS.personalised.affinityMultiplier +
           popularityScore * FS.personalised.popularityMultiplier +
           recencyBoost;
       } else if (hasPreferenceSeed) {
-        // Preference-seeded scoring: affinity from stated preferences + popularity
-        // Uses personalized multipliers so preferred categories clearly surface.
         finalScore =
           affinityScore * FS.personalised.affinityMultiplier +
           popularityScore * FS.personalised.popularityMultiplier +
           recencyBoost;
       } else {
-        // Pure cold-start fallback: Popularity + Recency only
         finalScore = popularityScore * FS.coldStart.popularityMultiplier + recencyBoost;
       }
 
-      // Session skip penalty: deprioritize (but don't hide) categories the user
-      // skipped during the current browsing session, passed via penalizedCategories.
+      // Taste Profile Alignment Boost
+      let tasteBoost = 0;
+      let spiceMatch = false;
+      let flavorMatchCount = 0;
+      const itemSpice = reel.foodItem?.tasteProfile?.spiceLevel || "medium";
+      const itemFlavors = reel.foodItem?.tasteProfile?.flavorTags || [];
+      const itemName = reel.foodItem?.name || "";
+
+      // Spice Match Scoring
+      if (userSpiceLevel && (itemSpice === userSpiceLevel || (userSpiceLevel === "extra-spicy" && itemSpice === "spicy"))) {
+        tasteBoost += 35;
+        spiceMatch = true;
+      } else if ((userSpiceLevel === "spicy" || userSpiceLevel === "extra-spicy") && /spicy|chili|schezwan|fiery|peri-peri|tikka|masala|hot/i.test(itemName)) {
+        tasteBoost += 25;
+        spiceMatch = true;
+      } else if (userSpiceLevel === "mild" && /sweet|shake|ice cream|dessert|smoothie|cake|donut/i.test(itemName)) {
+        tasteBoost += 25;
+        spiceMatch = true;
+      }
+
+      // Flavor Tags Overlap
+      if (userFlavorTags.length > 0) {
+        userFlavorTags.forEach((tag) => {
+          if (itemFlavors.includes(tag)) {
+            tasteBoost += 18;
+            flavorMatchCount++;
+          } else if (tag === "Cheesy" && /cheese|cheesy|mozzarella|parmesan|paneer/i.test(itemName)) {
+            tasteBoost += 15;
+            flavorMatchCount++;
+          } else if (tag === "Crispy" && /crispy|crunchy|fried|roast/i.test(itemName)) {
+            tasteBoost += 15;
+            flavorMatchCount++;
+          } else if (tag === "Tangy" && /tangy|lemon|chaat|chatpata|sour/i.test(itemName)) {
+            tasteBoost += 15;
+            flavorMatchCount++;
+          } else if (tag === "Creamy" && /creamy|makhani|malai|butter/i.test(itemName)) {
+            tasteBoost += 15;
+            flavorMatchCount++;
+          } else if (tag === "Smoky" && /smoky|bbq|barbecue|tandoor|grilled/i.test(itemName)) {
+            tasteBoost += 15;
+            flavorMatchCount++;
+          } else if (tag === "Sweet" && /sweet|chocolate|honey|caramel|dessert/i.test(itemName)) {
+            tasteBoost += 15;
+            flavorMatchCount++;
+          }
+        });
+      }
+
+      // Preferred Cuisine match
+      let cuisineMatch = false;
+      if (preferredCuisines.includes(category)) {
+        tasteBoost += 25;
+        cuisineMatch = true;
+      }
+
+      finalScore += tasteBoost;
+
+      // Session skip penalty
       if (category && penalizedCategorySet.has(category)) {
         finalScore -= FS.skipPenalty;
       }
 
-      return { reel, finalScore, category };
+      // Dynamic Taste Match Percentage Calculation
+      let matchPercent = 65;
+      if (reel.foodItem?.foodType === "veg" && userDietType !== "all") matchPercent += 10;
+      if (spiceMatch) matchPercent += 14;
+      if (flavorMatchCount > 0) matchPercent += Math.min(12, flavorMatchCount * 6);
+      if (cuisineMatch) matchPercent += 9;
+      matchPercent = Math.min(99, Math.max(70, matchPercent));
+
+      const tasteMatchBadges = [];
+      if (spiceMatch) {
+        tasteMatchBadges.push(userSpiceLevel === "extra-spicy" ? "🔥 Fiery Heat" : "🌶️ Matches Spice");
+      }
+      if (flavorMatchCount > 0) {
+        if (userFlavorTags.includes("Cheesy") && /cheese/i.test(itemName)) tasteMatchBadges.push("🧀 Cheesy");
+        else if (userFlavorTags.includes("Crispy") && /crisp/i.test(itemName)) tasteMatchBadges.push("🍗 Crispy");
+        else tasteMatchBadges.push("✨ Palate Match");
+      } else if (cuisineMatch) {
+        tasteMatchBadges.push(`🍜 ${category}`);
+      }
+      if (userDietType === "veg" || userDietType === "jain") {
+        tasteMatchBadges.push("🌱 Pure Veg");
+      }
+
+      const reelObj = reel.toObject ? reel.toObject() : { ...reel };
+      reelObj.tasteMatchPercent = matchPercent;
+      reelObj.tasteMatchBadges = tasteMatchBadges;
+
+      return { reel: reelObj, finalScore, category, tasteMatchPercent: matchPercent };
     });
 
+    // If user clicked 'My Taste Match' tab, filter to high match scores
+    let finalScoredList = scoredReels;
+    if (tasteFilter === "my_taste") {
+      const highMatches = scoredReels.filter((s) => s.tasteMatchPercent >= 80);
+      if (highMatches.length > 0) {
+        finalScoredList = highMatches;
+      }
+    }
+
     // Sort candidate reels by final score descending
-    scoredReels.sort((a, b) => b.finalScore - a.finalScore);
+    finalScoredList.sort((a, b) => b.finalScore - a.finalScore);
 
     // 5. EXPLORATION INJECTION (~15–20% slots reserved for exploration)
     //    Softmax-weighted rotation across the user's top-N affinity categories,
     //    so the feed diversifies rather than being pinned to a single category.
-    let orderedReels = scoredReels.map((item) => item.reel);
+    let orderedReels = finalScoredList.map((item) => item.reel);
 
     const { exploration: EXP } = RECOMMENDATION_WEIGHTS;
 
-    if ((hasSufficientHistory || hasPreferenceSeed) && scoredReels.length > 3) {
+    if ((hasSufficientHistory || hasPreferenceSeed) && finalScoredList.length > 3) {
       // Gather top-N categories by accumulated (decayed) affinity score
       const sortedCategories = Object.keys(categoryAffinity)
         .filter((cat) => categoryAffinity[cat] > 0)
@@ -444,7 +564,7 @@ export const getOwnerReels = async (req, res) => {
     let query = Reel.find({ owner: ownerId })
       .populate("owner", "fullName email")
       .populate("shop", "name city image")
-      .populate("foodItem", "name price image category foodType")
+      .populate("foodItem", "name price image category foodType tasteProfile")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -575,7 +695,7 @@ export const getLikedReels = async (req, res) => {
     const reels = await Reel.find({ likes: userId })
       .populate("owner", "fullName email")
       .populate("shop", "name city image")
-      .populate("foodItem", "name price image category foodType rating shop")
+      .populate("foodItem", "name price image category foodType tasteProfile rating shop")
       .sort({ updatedAt: -1 });
 
     return res.status(200).json(reels || []);

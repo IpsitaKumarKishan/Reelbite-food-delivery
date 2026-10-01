@@ -8,19 +8,23 @@ const formatUserCart = (cartArray) => {
     .filter(c => c && c.item)
     .map(c => {
       const itemIdStr = c.item._id ? c.item._id.toString() : c.item.toString();
+      const extraPrice = Number(c.customization?.extraPrice) || 0;
       return {
         id: itemIdStr,
         _id: itemIdStr,
         name: c.item.name || "",
-        price: c.item.price || 0,
+        price: (c.item.price || 0) + extraPrice,
+        basePrice: c.item.price || 0,
         image: c.item.image || "",
         quantity: c.quantity || 1,
         shop: c.item.shop || null,
         category: c.item.category || "",
-        foodType: c.item.foodType || ""
+        foodType: c.item.foodType || "",
+        customization: c.customization || null
       };
     });
 };
+
 
 export const getCurrentUser = async (req, res) => {
   try {
@@ -75,7 +79,7 @@ export const getCart = async (req, res) => {
 
 export const addToCartBackend = async (req, res) => {
   try {
-    const { itemId, quantity = 1 } = req.body
+    const { itemId, quantity = 1, customization } = req.body
     if (!itemId) return res.status(400).json({ message: "itemId is required" })
 
     const user = await User.findById(req.userId)
@@ -90,8 +94,11 @@ export const addToCartBackend = async (req, res) => {
 
     if (existingIndex > -1) {
       user.cart[existingIndex].quantity += Number(quantity)
+      if (customization) {
+        user.cart[existingIndex].customization = customization
+      }
     } else {
-      user.cart.push({ item: itemId, quantity: Number(quantity) })
+      user.cart.push({ item: itemId, quantity: Number(quantity), customization: customization || null })
     }
 
     await user.save()
@@ -101,6 +108,7 @@ export const addToCartBackend = async (req, res) => {
     return res.status(500).json({ message: `addToCart error ${error}` })
   }
 }
+
 
 export const updateCartQuantityBackend = async (req, res) => {
   try {
@@ -201,34 +209,76 @@ export const updateDietPreference = async (req, res) => {
 
 /**
  * PATCH /api/user/preferences
- * Saves the user's preferred cuisine categories chosen during onboarding.
- * Accepts { preferredCuisines: string[] }. An empty array (user skipped)
- * is valid — the cold-start logic checks for non-empty before using it.
+ * Saves the user's preferred cuisines, diet type, spice level, flavor tags, and allergies.
+ * Accepts:
+ *   preferredCuisines?: string[]
+ *   foodPreferences?: { dietType?, spiceLevel?, flavorTags?, allergies? }
+ *   or direct fields: dietType, spiceLevel, flavorTags, allergies
  */
 export const updatePreferences = async (req, res) => {
   try {
-    const { preferredCuisines } = req.body
-    if (!Array.isArray(preferredCuisines)) {
-      return res.status(400).json({ message: "preferredCuisines must be an array" })
+    const { preferredCuisines, foodPreferences, dietType, spiceLevel, flavorTags, allergies } = req.body;
+
+    const updateFields = {};
+
+    if (preferredCuisines !== undefined) {
+      if (!Array.isArray(preferredCuisines)) {
+        return res.status(400).json({ message: "preferredCuisines must be an array" });
+      }
+      updateFields.preferredCuisines = preferredCuisines;
+    }
+
+    const incomingFoodPrefs = foodPreferences || {};
+    const effectiveDietType = incomingFoodPrefs.dietType || dietType;
+    const effectiveSpiceLevel = incomingFoodPrefs.spiceLevel || spiceLevel;
+    const effectiveFlavorTags = incomingFoodPrefs.flavorTags || flavorTags;
+    const effectiveAllergies = incomingFoodPrefs.allergies || allergies;
+
+    if (effectiveDietType !== undefined) {
+      updateFields["foodPreferences.dietType"] = effectiveDietType;
+      // Keep legacy dietPreference synchronized for compatibility
+      if (["veg", "vegan", "jain"].includes(effectiveDietType)) {
+        updateFields.dietPreference = "veg";
+      } else {
+        updateFields.dietPreference = "all";
+      }
+    }
+
+    if (effectiveSpiceLevel !== undefined) {
+      updateFields["foodPreferences.spiceLevel"] = effectiveSpiceLevel;
+    }
+
+    if (effectiveFlavorTags !== undefined) {
+      if (!Array.isArray(effectiveFlavorTags)) {
+        return res.status(400).json({ message: "flavorTags must be an array" });
+      }
+      updateFields["foodPreferences.flavorTags"] = effectiveFlavorTags;
+    }
+
+    if (effectiveAllergies !== undefined) {
+      if (!Array.isArray(effectiveAllergies)) {
+        return res.status(400).json({ message: "allergies must be an array" });
+      }
+      updateFields["foodPreferences.allergies"] = effectiveAllergies;
     }
 
     const user = await User.findByIdAndUpdate(
       req.userId,
-      { preferredCuisines },
+      { $set: updateFields },
       { new: true }
-    ).populate("cart.item")
+    ).populate("cart.item");
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" })
+      return res.status(404).json({ message: "User not found" });
     }
 
-    const userObj = user.toObject()
-    userObj.cart = formatUserCart(user.cart)
-    return res.status(200).json(userObj)
+    const userObj = user.toObject();
+    userObj.cart = formatUserCart(user.cart);
+    return res.status(200).json(userObj);
   } catch (error) {
-    return res.status(500).json({ message: `Update preferences error ${error}` })
+    return res.status(500).json({ message: `Update preferences error ${error.message || error}` });
   }
-}
+};
 
 /**
  * GET /api/user/cuisine-categories
