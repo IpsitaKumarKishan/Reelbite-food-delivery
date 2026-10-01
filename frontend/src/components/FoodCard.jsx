@@ -72,7 +72,7 @@ function FoodCard({ data }) {
   };
 
   return (
-    <div className='w-full max-w-[320px] sm:max-w-[270px] rounded-3xl border border-amber-500/20 bg-white shadow-md hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden group mx-auto sm:mx-0'>
+    <div className='w-full max-w-[320px] sm:max-w-[270px] rounded-3xl border border-amber-500/20 bg-white shadow-md hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 ease-in-out flex flex-col overflow-hidden group mx-auto sm:mx-0'>
       
       {/* Image container */}
       <div className='relative w-full h-[160px] sm:h-[180px] bg-stone-100 overflow-hidden'>
@@ -87,7 +87,7 @@ function FoodCard({ data }) {
         <img
           src={data.image}
           alt={data.name}
-          className='w-full h-full object-cover group-hover:scale-108 transition-transform duration-500'
+          className='w-full h-full object-cover group-hover:scale-108 transition-transform duration-500 ease-in-out'
         />
       </div>
 

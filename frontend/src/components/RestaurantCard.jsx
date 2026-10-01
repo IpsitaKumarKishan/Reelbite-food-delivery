@@ -13,14 +13,14 @@ const RestaurantCard = ({ shop, onClick }) => {
   return (
     <div
       onClick={onClick}
-      className="w-full max-w-[320px] sm:max-w-none sm:w-[280px] md:w-[300px] bg-white rounded-2xl border border-stone-200/80 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer group flex flex-col mx-auto sm:mx-0"
+      className="w-full max-w-[320px] sm:max-w-none sm:w-[280px] md:w-[300px] bg-white rounded-2xl border border-stone-200/80 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 ease-in-out overflow-hidden cursor-pointer group flex flex-col mx-auto sm:mx-0"
     >
       {/* Cover Image Container */}
       <div className="relative w-full h-[180px] bg-stone-100 overflow-hidden">
         <img
           src={shop.image}
           alt={shop.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-in-out"
         />
 
         {/* Gradient dark overlay */}

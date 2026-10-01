@@ -63,7 +63,7 @@ export const getShopByCity = async (req, res) => {
     try {
         const { city } = req.params;
         const activeFilter = {
-            status: "active",
+            status: { $ne: "suspended" },
             isApproved: { $ne: false },
         };
 

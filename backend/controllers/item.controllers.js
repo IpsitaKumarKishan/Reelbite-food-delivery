@@ -112,7 +112,7 @@ export const getItemByCity = async (req, res) => {
     try {
         const { city } = req.params;
         const activeFilter = {
-            status: "active",
+            status: { $ne: "suspended" },
             isApproved: { $ne: false },
         };
 
@@ -131,10 +131,21 @@ export const getItemByCity = async (req, res) => {
             .filter((shop) => shop.owner && shop.owner.status !== "suspended")
             .map((shop) => shop._id);
 
-        const items = await Item.find({ shop: { $in: validShopIds } })
+        let items = await Item.find({ shop: { $in: validShopIds } })
             .populate("shop", "name image city")
             .lean();
-        return res.status(200).json(items);
+
+        if ((!items || items.length === 0) && validShopIds.length === 0) {
+            const allActiveShops = await Shop.find(activeFilter).populate('owner', 'status').lean();
+            const allActiveShopIds = allActiveShops
+                .filter(s => s.owner && s.owner.status !== "suspended")
+                .map(s => s._id);
+            items = await Item.find({ shop: { $in: allActiveShopIds } })
+                .populate("shop", "name image city")
+                .lean();
+        }
+
+        return res.status(200).json(items || []);
 
     } catch (error) {
         return res.status(500).json({ message: `get item by city error ${error.message || error}` });
