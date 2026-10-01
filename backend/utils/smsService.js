@@ -12,11 +12,16 @@ const getTwilioClient = () => {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
 
-  if (accountSid && authToken && !twilioClient) {
+  if (!accountSid || !authToken) {
+    return null;
+  }
+
+  if (!twilioClient) {
     try {
       twilioClient = twilio(accountSid, authToken);
     } catch (err) {
       console.error("[Twilio Init Error]:", err.message);
+      return null;
     }
   }
   return twilioClient;
@@ -25,82 +30,50 @@ const getTwilioClient = () => {
 /**
  * Normalizes phone number into E.164 format for international SMS delivery.
  * Defaults to +91 (India) if 10-digit number without country code is provided.
+ * Strips all non-digit characters to prevent injection.
  */
 export const formatE164Number = (mobile) => {
   if (!mobile) return "";
-  const cleaned = mobile.toString().replace(/\s+/g, "").replace(/[-()]/g, "");
-  if (cleaned.startsWith("+")) {
-    return cleaned;
+  const str = String(mobile).trim();
+  const hasPlus = str.startsWith("+");
+  const digits = str.replace(/\D/g, "");
+  if (!digits) return "";
+
+  if (hasPlus) {
+    return `+${digits}`;
   }
-  if (cleaned.length === 10) {
-    return `+91${cleaned}`;
+  if (digits.length === 10) {
+    return `+91${digits}`;
   }
-  if (cleaned.length === 12 && cleaned.startsWith("91")) {
-    return `+${cleaned}`;
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return `+${digits}`;
   }
-  return `+${cleaned}`;
+  return `+${digits}`;
 };
 
 export const sendPhoneOtpSms = async (mobile, otp) => {
   const formattedMobile = formatE164Number(mobile);
-  const fromNumber = process.env.TWILIO_PHONE_NUMBER || "+17372508034";
+  if (!formattedMobile) {
+    return { success: false, error: "Invalid phone number format." };
+  }
+  if (!otp) {
+    return { success: false, error: "OTP code is required." };
+  }
+
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+  const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+  const isProduction = process.env.NODE_ENV === "production";
   const client = getTwilioClient();
   let lastTwilioError = null;
 
-  // 1. Primary: Twilio Programmable SMS Dispatch (client.messages.create)
-  if (client) {
-    // Attempt custom message body first
-    try {
-      const message = await client.messages.create({
-        body: `Your ReelBite verification code is ${otp}. Valid for 5 minutes. Do not share this code with anyone.`,
-        from: fromNumber,
-        to: formattedMobile,
-      });
-
-      console.log(`[Twilio SMS Sent]: SID=${message.sid} To=${formattedMobile}`);
-      return {
-        success: true,
-        provider: "twilio",
-        messageSid: message.sid,
-        status: message.status,
-      };
-    } catch (err) {
-      lastTwilioError = err.message || String(err);
-      console.warn(`[Twilio SMS Attempt]: ${lastTwilioError}`);
-
-      // If trial account requires predefined template (e.g., 'sms_appointment_reminders')
-      if (lastTwilioError.includes("predefined SMS templates") || lastTwilioError.includes("template")) {
-        try {
-          const templateMessage = await client.messages.create({
-            body: "sms_appointment_reminders",
-            from: fromNumber,
-            to: formattedMobile,
-          });
-
-          console.log(`[Twilio Template SMS Sent]: SID=${templateMessage.sid} To=${formattedMobile}`);
-          return {
-            success: true,
-            provider: "twilio_template",
-            messageSid: templateMessage.sid,
-            status: templateMessage.status,
-          };
-        } catch (templateErr) {
-          lastTwilioError = templateErr.message || String(templateErr);
-          console.error(`[Twilio Template Error]:`, lastTwilioError);
-        }
-      }
-    }
-  }
-
-  // 2. Secondary: Twilio Verify Service (Delivers direct 6-digit numeric OTP)
-  const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+  // 1. Primary: Twilio Verify Service (Purpose-built for OTPs, works on Trial & Production)
   if (client && verifyServiceSid) {
     try {
       const verification = await client.verify.v2.services(verifyServiceSid)
         .verifications
         .create({ to: formattedMobile, channel: "sms" });
 
-      console.log(`[Twilio Verify SMS Sent]: SID=${verification.sid} Status=${verification.status} To=${formattedMobile}`);
       return {
         success: true,
         provider: "twilio_verify",
@@ -109,22 +82,59 @@ export const sendPhoneOtpSms = async (mobile, otp) => {
       };
     } catch (err) {
       lastTwilioError = err.message || String(err);
-      console.error(`[Twilio Verify Error]:`, lastTwilioError);
+      console.warn(`[Twilio Verify Attempt Failed]:`, lastTwilioError);
     }
   }
 
-  // 3. Fallback: Log to console and provide dev OTP
-  console.log(`\n======================================================`);
-  console.log(`📲 [REELBITE PHONE OTP DISPATCH]`);
-  console.log(`To: ${formattedMobile || mobile}`);
-  console.log(`Your ReelBite verification code is: [ ${otp} ]`);
-  console.log(`Valid for 5 minutes. Do not share with anyone.`);
-  if (lastTwilioError) {
-    console.log(`⚠️ Twilio notice: ${lastTwilioError}`);
-  }
-  console.log(`======================================================\n`);
+  // 2. Secondary: Twilio Programmable SMS Dispatch (client.messages.create)
+  if (client && (fromNumber || messagingServiceSid)) {
+    try {
+      const messagePayload = {
+        body: `Your ReelBite verification code is ${otp}. Valid for 5 minutes. Do not share this code with anyone.`,
+        to: formattedMobile,
+      };
+      if (messagingServiceSid) {
+        messagePayload.messagingServiceSid = messagingServiceSid;
+      } else {
+        messagePayload.from = fromNumber;
+      }
 
-  return { success: true, provider: "console_fallback", twilioError: lastTwilioError };
+      const message = await client.messages.create(messagePayload);
+
+      return {
+        success: true,
+        provider: "twilio",
+        messageSid: message.sid,
+        status: message.status,
+      };
+    } catch (err) {
+      lastTwilioError = err.message || String(err);
+      console.warn(`[Twilio SMS Attempt Failed]:`, lastTwilioError);
+    }
+  }
+
+  // 3. Fallback: Development / Test Mode ONLY
+  if (!isProduction) {
+    console.log(`\n======================================================`);
+    console.log(`📲 [DEV ONLY - REELBITE PHONE OTP DISPATCH]`);
+    console.log(`To: ${formattedMobile}`);
+    console.log(`Your ReelBite verification code is: [ ${otp} ]`);
+    console.log(`Valid for 5 minutes. Do not share with anyone.`);
+    if (lastTwilioError) {
+      console.log(`⚠️ Twilio notice: ${lastTwilioError}`);
+    }
+    console.log(`======================================================\n`);
+
+    return { success: true, provider: "console_fallback", twilioError: lastTwilioError };
+  }
+
+  // In production, do not expose OTP to logs or pretend delivery succeeded when it didn't
+  console.error(`[SMS Dispatch Error]: Failed to send OTP to ${formattedMobile.slice(0, 4)}****. Twilio error: ${lastTwilioError || "Credentials not configured"}`);
+  return {
+    success: false,
+    error: "Unable to send SMS verification code at this time. Please try again later.",
+    twilioError: lastTwilioError,
+  };
 };
 
 /**
@@ -133,6 +143,10 @@ export const sendPhoneOtpSms = async (mobile, otp) => {
 export const verifyTwilioOtp = async (mobile, code) => {
   const formattedMobile = formatE164Number(mobile);
   const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+
+  if (!formattedMobile || !code) {
+    return { success: false, approved: false, message: "Mobile number and code are required." };
+  }
 
   if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && verifyServiceSid) {
     const client = getTwilioClient();
@@ -156,4 +170,3 @@ export const verifyTwilioOtp = async (mobile, code) => {
 
   return { success: false, approved: false, message: "Twilio Verify service not configured" };
 };
-

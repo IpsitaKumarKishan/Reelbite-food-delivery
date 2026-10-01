@@ -27,6 +27,7 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
   const [isPhoneVerified, setIsPhoneVerified] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [phoneOtp, setPhoneOtp] = useState('');
+  const [devOtp, setDevOtp] = useState('');
   const [otpTimer, setOtpTimer] = useState(0);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
@@ -43,6 +44,7 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
     setIsPhoneVerified(false);
     setOtpSent(false);
     setPhoneOtp('');
+    setDevOtp('');
     setOtpTimer(0);
     setGooglePending(null);
     setPendingMobile('');
@@ -96,14 +98,19 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
     setSendingOtp(true);
     setErr('');
     try {
-      await axios.post(
+      const res = await axios.post(
         `${serverUrl}/api/auth/send-phone-otp`,
         { mobile: phoneRes.clean },
         { withCredentials: true }
       );
       setOtpSent(true);
       setOtpTimer(60);
-      setPhoneOtp('');
+      if (res.data?.devOtp) {
+        setDevOtp(res.data.devOtp);
+        setPhoneOtp(res.data.devOtp);
+      } else {
+        setPhoneOtp('');
+      }
     } catch (error) {
       setErr(error?.response?.data?.message || 'Failed to send OTP to mobile number');
     } finally {
@@ -530,6 +537,19 @@ export default function LoginModal({ isOpen, onClose, initialMode = 'signin' }) 
                               Enter 6-digit OTP sent to +91 {mobile}
                             </span>
                           </div>
+
+                          {devOtp && (
+                            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-semibold">
+                              <span>🛠️ Dev OTP: <strong className="font-mono text-[#ff5200] bg-white px-1.5 py-0.5 rounded border border-amber-200">{devOtp}</strong></span>
+                              <button
+                                type="button"
+                                onClick={() => setPhoneOtp(devOtp)}
+                                className="text-[10px] font-extrabold text-[#ff5200] hover:underline"
+                              >
+                                Auto-fill
+                              </button>
+                            </div>
+                          )}
 
                           <div className="flex items-center gap-2">
                             <input

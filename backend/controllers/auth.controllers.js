@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import User from "../models/user.model.js"
 import PhoneOtp from "../models/phoneOtp.model.js"
 import bcrypt from "bcryptjs"
@@ -52,12 +53,15 @@ export const sendPhoneOtp = async (req, res) => {
             return res.status(429).json({ message: `Please wait ${secondsLeft > 0 ? secondsLeft : 60} seconds before requesting a new OTP.` });
         }
 
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otp = crypto.randomInt(100000, 1000000).toString();
 
         // Invalidate previous unverified OTPs for this phone number
         await PhoneOtp.deleteMany({ mobile: cleanMobile, verified: false });
 
         const smsResult = await sendPhoneOtpSms(cleanMobile, otp);
+        if (!smsResult?.success) {
+            return res.status(502).json({ message: smsResult?.error || "Failed to dispatch verification code. Please try again later." });
+        }
 
         await PhoneOtp.create({
             mobile: cleanMobile,
@@ -68,9 +72,11 @@ export const sendPhoneOtp = async (req, res) => {
             provider: smsResult?.provider || "local"
         });
 
+        const isDev = process.env.NODE_ENV !== "production";
         return res.status(200).json({
             message: `OTP sent successfully to +91 ${cleanMobile}`,
             mobile: cleanMobile,
+            devOtp: isDev ? otp : undefined
         });
     } catch (error) {
         return res.status(500).json({ message: `sendPhoneOtp error: ${error.message || error}` });
@@ -291,7 +297,7 @@ export const sendOtp = async (req, res) => {
             return res.status(400).json({ message: "User does not exist." })
         }
 
-        const otp = Math.floor(1000 + Math.random() * 9000).toString()
+        const otp = crypto.randomInt(1000, 10000).toString();
         user.resetOtp = otp
         user.otpExpires = Date.now() + 5 * 60 * 1000
         user.isOtpVerified = false
@@ -300,10 +306,17 @@ export const sendOtp = async (req, res) => {
         if (user.email && isEmail) {
             await sendOtpMail(user.email, otp)
         } else if (user.mobile) {
-            await sendPhoneOtpSms(user.mobile, otp)
+            const smsResult = await sendPhoneOtpSms(user.mobile, otp)
+            if (!smsResult?.success) {
+                return res.status(502).json({ message: smsResult?.error || "Failed to dispatch verification code via SMS." });
+            }
         }
 
-        return res.status(200).json({ message: "OTP sent successfully." })
+        const isDev = process.env.NODE_ENV !== "production";
+        return res.status(200).json({
+            message: "OTP sent successfully.",
+            devOtp: isDev ? otp : undefined
+        });
     } catch (error) {
         return res.status(500).json(`send otp error ${error}`)
     }

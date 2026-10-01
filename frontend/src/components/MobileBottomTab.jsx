@@ -23,7 +23,7 @@ const MobileBottomTab = () => {
   const isReels = location.pathname === "/reels";
 
   // Check active routes
-  const isHomeActive = location.pathname === "/" || location.pathname === "/landing";
+  const isHomeActive = location.pathname === "/";
   const isReelsActive = location.pathname === "/reels";
   const isCartActive = location.pathname === "/cart";
   const isProfileActive =
@@ -31,6 +31,11 @@ const MobileBottomTab = () => {
     location.pathname === "/owner/reels" ||
     location.pathname === "/liked-reels" ||
     location.pathname === "/signin";
+
+  // Hide bottom nav on landing page
+  const isLandingPage =
+    location.pathname === "/landing" ||
+    (location.pathname === "/" && !userData);
 
   // Focus search input when search modal opens
   useEffect(() => {
@@ -69,6 +74,10 @@ const MobileBottomTab = () => {
 
     return () => clearTimeout(timer);
   }, [searchQuery, currentCity]);
+
+  if (isLandingPage) {
+    return null;
+  }
 
   const handleSelectSearchItem = (item) => {
     setIsSearchOpen(false);

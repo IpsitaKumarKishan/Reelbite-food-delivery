@@ -10,6 +10,7 @@ function ForgotPassword() {
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
+  const [devOtp, setDevOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [err, setErr] = useState('');
@@ -26,7 +27,11 @@ function ForgotPassword() {
     setLoading(true);
     setErr('');
     try {
-      await axios.post(`${serverUrl}/api/auth/send-otp`, { email }, { withCredentials: true });
+      const res = await axios.post(`${serverUrl}/api/auth/send-otp`, { email }, { withCredentials: true });
+      if (res.data?.devOtp) {
+        setDevOtp(res.data.devOtp);
+        setOtp(res.data.devOtp);
+      }
       setErr('');
       setStep(2);
       setLoading(false);
@@ -177,6 +182,18 @@ function ForgotPassword() {
         {/* Step 2: Verify OTP */}
         {step === 2 && (
           <form onSubmit={handleVerifyOtp} className="space-y-4">
+            {devOtp && (
+              <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
+                <span>🛠️ Dev OTP: <strong className="font-mono text-[#ff5200] bg-white px-2 py-0.5 rounded border border-amber-200">{devOtp}</strong></span>
+                <button
+                  type="button"
+                  onClick={() => setOtp(devOtp)}
+                  className="text-xs font-extrabold text-[#ff5200] hover:underline cursor-pointer"
+                >
+                  Auto-fill
+                </button>
+              </div>
+            )}
             <div>
               <label className="block text-xs font-bold text-stone-700 mb-1">4-Digit OTP Code</label>
               <div className="relative">
