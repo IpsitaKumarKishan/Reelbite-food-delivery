@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import Nav from './Nav';
 import { useSelector } from 'react-redux';
 import FoodCard from './FoodCard';
@@ -10,12 +10,25 @@ import OrderAgainCarousel from './OrderAgainCarousel';
 import TimeSlotCarousel from './TimeSlotCarousel';
 import SearchFilterBar from './SearchFilterBar';
 import FoodPreferencesModal from './modals/FoodPreferencesModal';
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa6';
+
 
 function UserDashboard() {
   const { currentCity, shopInMyCity, itemsInMyCity, searchItems, userData } = useSelector(state => state.user);
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState("All");
   const [isTasteModalOpen, setIsTasteModalOpen] = useState(false);
+  const palateScrollRef = useRef(null);
+
+  const scrollPalate = (direction) => {
+    if (palateScrollRef.current) {
+      palateScrollRef.current.scrollBy({
+        left: direction === "left" ? -320 : 320,
+        behavior: "smooth"
+      });
+    }
+  };
+
 
   // Hook for personalized recommendations (Order Again & Time of Day)
   const { orderAgain, timeSlot, forYou } = useGetRecommendations();
@@ -251,25 +264,76 @@ function UserDashboard() {
                   Dishes handpicked to match your saved taste profile, diet choices & preferred spices
                 </p>
               </div>
-              <button
-                onClick={() => setIsTasteModalOpen(true)}
-                className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-white hover:bg-stone-50 text-stone-800 border border-stone-300 shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>⚙️</span>
-                <span>Tune Palate</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsTasteModalOpen(true)}
+                  className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-white hover:bg-stone-50 text-stone-800 border border-stone-300 shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>⚙️</span>
+                  <span>Tune Palate</span>
+                </button>
+
+                {/* Left and Right navigation buttons */}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => scrollPalate("left")}
+                    className="w-8 h-8 rounded-full bg-white hover:bg-stone-100 text-stone-700 border border-stone-300 shadow-xs flex items-center justify-center transition cursor-pointer hover:border-[#ff5200] hover:text-[#ff5200] active:scale-95"
+                    aria-label="Scroll left"
+                    title="Previous dishes"
+                  >
+                    <FaChevronLeft size={11} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => scrollPalate("right")}
+                    className="w-8 h-8 rounded-full bg-white hover:bg-stone-100 text-stone-700 border border-stone-300 shadow-xs flex items-center justify-center transition cursor-pointer hover:border-[#ff5200] hover:text-[#ff5200] active:scale-95"
+                    aria-label="Scroll right"
+                    title="Next dishes"
+                  >
+                    <FaChevronRight size={11} />
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* Horizontal Scroll Carousel */}
-            <div className="flex items-stretch gap-4 overflow-x-auto pb-2 pt-1 scrollbar-thin">
-              {curatedPalateItems.map((item) => (
-                <div key={item._id} className="shrink-0 w-[240px] sm:w-[260px]">
-                  <FoodCard data={item} />
-                </div>
-              ))}
+            {/* Horizontal Scroll Carousel with side buttons */}
+            <div className="relative group/palate">
+              {/* Floating Left Button */}
+              <button
+                type="button"
+                onClick={() => scrollPalate("left")}
+                className="hidden sm:flex absolute -left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white text-stone-800 border border-stone-200 shadow-lg items-center justify-center z-10 transition-all duration-200 hover:bg-[#ff5200] hover:text-white hover:scale-105 cursor-pointer opacity-0 group-hover/palate:opacity-100"
+                aria-label="Scroll left"
+              >
+                <FaChevronLeft size={11} />
+              </button>
+
+              <div
+                ref={palateScrollRef}
+                className="flex items-stretch gap-4 overflow-x-auto pb-2 pt-1 scrollbar-thin scroll-smooth"
+              >
+                {curatedPalateItems.map((item) => (
+                  <div key={item._id} className="shrink-0 w-[240px] sm:w-[260px]">
+                    <FoodCard data={item} />
+                  </div>
+                ))}
+              </div>
+
+              {/* Floating Right Button */}
+              <button
+                type="button"
+                onClick={() => scrollPalate("right")}
+                className="hidden sm:flex absolute -right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white text-stone-800 border border-stone-200 shadow-lg items-center justify-center z-10 transition-all duration-200 hover:bg-[#ff5200] hover:text-white hover:scale-105 cursor-pointer opacity-0 group-hover/palate:opacity-100"
+                aria-label="Scroll right"
+              >
+                <FaChevronRight size={11} />
+              </button>
             </div>
           </section>
         )}
+
 
         {/* Reels Near You Strip */}
         <ReelTeaserStrip />
