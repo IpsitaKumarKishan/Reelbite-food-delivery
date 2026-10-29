@@ -363,18 +363,7 @@ const ReelCard = ({ reel, currentUser, onSkip, onImpression, isMuted, setIsMuted
         </div>
       )}
 
-      {/* Taste Match Badge */}
-      {reel.tasteMatchPercent && reel.tasteMatchPercent >= 70 && (
-        <div className="absolute top-4 left-4 z-20 flex items-center gap-1.5 bg-black/60 backdrop-blur-md border border-amber-500/40 text-amber-300 px-3 py-1.5 rounded-full text-[11px] font-black shadow-lg">
-          <span>✨</span>
-          <span>{reel.tasteMatchPercent}% Taste Match</span>
-          {reel.tasteMatchBadges?.[0] && (
-            <span className="bg-amber-500/20 text-white text-[9px] px-1.5 py-0.5 rounded-full border border-amber-400/30">
-              {reel.tasteMatchBadges[0]}
-            </span>
-          )}
-        </div>
-      )}
+
 
       {/* Sound / Volume Toggle Button */}
       <button
@@ -826,28 +815,6 @@ const Reels = () => {
           <span>Home</span>
         </button>
 
-        {/* Interactive Taste Filters Strip */}
-        <div className="pointer-events-auto flex items-center gap-1 bg-black/60 p-1 rounded-full backdrop-blur-md border border-white/10 shadow-lg">
-          {[
-            { id: "all", label: "All" },
-            { id: "my_taste", label: "🎯 My Taste" },
-            { id: "spicy", label: "🔥 Spicy" },
-            { id: "veg", label: "🌱 Veg" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => handleTasteFilterChange(tab.id)}
-              className={`px-3 py-1 rounded-full text-[11px] font-bold transition cursor-pointer ${
-                tasteFilter === tab.id
-                  ? "bg-[#ff5200] text-white shadow-xs"
-                  : "text-stone-300 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
         {userData?.role === "owner" ? (
           <button
             onClick={() => navigate("/owner/reels")}
@@ -859,6 +826,27 @@ const Reels = () => {
         ) : (
           <div className="w-12 hidden sm:block" />
         )}
+      </div>
+
+      {/* Side Filter Bar (All / My Taste) - Positioned to the side, not over the video */}
+      <div className="fixed left-4 top-20 sm:left-6 md:left-8 sm:top-1/2 sm:-translate-y-1/2 z-40 flex sm:flex-col items-center sm:items-start gap-1.5 bg-black/75 p-1.5 rounded-full sm:rounded-2xl backdrop-blur-md border border-white/10 shadow-2xl">
+        <span className="text-[10px] font-bold text-stone-400 px-2 pt-1 uppercase tracking-wider hidden sm:block">Feed</span>
+        {[
+          { id: "all", label: "All" },
+          { id: "my_taste", label: "🎯 My Taste" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => handleTasteFilterChange(tab.id)}
+            className={`px-3.5 py-1.5 rounded-full sm:rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap active:scale-95 ${
+              tasteFilter === tab.id
+                ? "bg-[#ff5200] text-white shadow-md shadow-orange-500/25"
+                : "text-stone-300 hover:text-white hover:bg-white/10"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {loading ? (

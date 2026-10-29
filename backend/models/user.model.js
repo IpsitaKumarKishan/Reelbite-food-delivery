@@ -9,8 +9,6 @@ const userSchema = new mongoose.Schema({
     email: {
         type: String,
         required: false,
-        unique: true,
-        sparse: true,
         trim: true,
         lowercase: true
     },
@@ -114,6 +112,7 @@ coordinates:{type:[Number],default:[0,0]}
 
 userSchema.index({ location: '2dsphere' })
 userSchema.index({ role: 1, isOnline: 1 })
+userSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: "string" } } })
 
 const User=mongoose.model("User",userSchema)
 export default User

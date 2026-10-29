@@ -20,7 +20,26 @@ export const ensureIndexes = async () => {
     await User.collection.createIndex({ location: "2dsphere" });
     await User.collection.createIndex({ role: 1, isOnline: 1 });
     await User.collection.createIndex({ mobile: 1 }, { unique: true });
-    await User.collection.createIndex({ email: 1 }, { unique: true, sparse: true });
+
+    // Ensure email index uses partialFilterExpression so multiple accounts without email don't collide
+    try {
+      const userIndexes = await User.collection.indexes();
+      const legacyEmailIndex = userIndexes.find((idx) => idx.name === "email_1" || (idx.key && idx.key.email));
+      if (legacyEmailIndex && (!legacyEmailIndex.partialFilterExpression || !legacyEmailIndex.partialFilterExpression.email)) {
+        await User.collection.dropIndex(legacyEmailIndex.name);
+      }
+      await User.collection.updateMany({ email: { $in: [null, ""] } }, { $unset: { email: "" } });
+      await User.collection.createIndex(
+        { email: 1 },
+        {
+          unique: true,
+          partialFilterExpression: { email: { $type: "string" } },
+          name: "email_1"
+        }
+      );
+    } catch (idxErr) {
+      console.log("Email index notice:", idxErr.message || idxErr);
+    }
 
     await Reel.collection.createIndex({ likes: 1 });
     await Reel.collection.createIndex({ shop: 1, createdAt: -1 });
