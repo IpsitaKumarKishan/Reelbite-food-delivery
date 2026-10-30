@@ -216,7 +216,7 @@ export const placeOrder = async (req, res) => {
         await newOrder.populate("shopOrders.shopOrderItems.item", "name image price")
         await newOrder.populate("shopOrders.shop", "name")
         await newOrder.populate("shopOrders.owner", "name socketId")
-        await newOrder.populate("user", "name email mobile")
+        await newOrder.populate("user", "fullName email mobile")
 
         const io = req.app.get('io')
 
@@ -227,7 +227,11 @@ export const placeOrder = async (req, res) => {
                     io.to(ownerSocketId).emit('newOrder', {
                         _id: newOrder._id,
                         paymentMethod: newOrder.paymentMethod,
-                        user: newOrder.user,
+                        user: newOrder.user || {
+                            fullName: "Customer",
+                            email: "N/A",
+                            mobile: newOrder.contactMobile || "N/A"
+                        },
                         shopOrders: shopOrder,
                         createdAt: newOrder.createdAt,
                         deliveryAddress: newOrder.deliveryAddress,
@@ -286,7 +290,7 @@ export const verifyPayment = async (req, res) => {
         await order.populate("shopOrders.shopOrderItems.item", "name image price")
         await order.populate("shopOrders.shop", "name")
         await order.populate("shopOrders.owner", "name socketId")
-        await order.populate("user", "name email mobile")
+        await order.populate("user", "fullName email mobile")
 
         const io = req.app.get('io')
 
@@ -297,7 +301,11 @@ export const verifyPayment = async (req, res) => {
                     io.to(ownerSocketId).emit('newOrder', {
                         _id: order._id,
                         paymentMethod: order.paymentMethod,
-                        user: order.user,
+                        user: order.user || {
+                            fullName: "Customer",
+                            email: "N/A",
+                            mobile: order.contactMobile || "N/A"
+                        },
                         shopOrders: shopOrder,
                         createdAt: order.createdAt,
                         deliveryAddress: order.deliveryAddress,
@@ -349,7 +357,7 @@ export const getMyOrders = async (req, res) => {
             let query = Order.find({ "shopOrders.owner": req.userId })
                 .sort({ createdAt: -1 })
                 .populate("shopOrders.shop", "name")
-                .populate("user")
+                .populate("user", "fullName email mobile")
                 .populate("shopOrders.shopOrderItems.item", "name image price")
                 .populate("shopOrders.assignedDeliveryBoy", "fullName mobile")
                 .lean()
@@ -362,8 +370,17 @@ export const getMyOrders = async (req, res) => {
                 const filteredOrders = orders.map((order => ({
                     _id: order._id,
                     paymentMethod: order.paymentMethod,
-                    user: order.user,
-                    shopOrders: order.shopOrders?.find(o => o.owner?._id?.toString() == req.userId || o.owner?.toString() == req.userId),
+                    user: order.user || {
+                        fullName: order.deliveryAddress?.name || "Customer",
+                        email: "N/A",
+                        mobile: order.contactMobile || "N/A"
+                    },
+                    shopOrders: order.shopOrders?.find(o => o.owner?._id?.toString() == req.userId || o.owner?.toString() == req.userId) || {
+                        shop: {},
+                        shopOrderItems: [],
+                        status: "pending",
+                        subtotal: 0
+                    },
                     createdAt: order.createdAt,
                     deliveryAddress: order.deliveryAddress,
                     payment: order.payment
@@ -375,8 +392,17 @@ export const getMyOrders = async (req, res) => {
             const filteredOrders = orders.map((order => ({
                 _id: order._id,
                 paymentMethod: order.paymentMethod,
-                user: order.user,
-                shopOrders: order.shopOrders?.find(o => o.owner?._id?.toString() == req.userId || o.owner?.toString() == req.userId),
+                user: order.user || {
+                    fullName: order.deliveryAddress?.name || "Customer",
+                    email: "N/A",
+                    mobile: order.contactMobile || "N/A"
+                },
+                shopOrders: order.shopOrders?.find(o => o.owner?._id?.toString() == req.userId || o.owner?.toString() == req.userId) || {
+                    shop: {},
+                    shopOrderItems: [],
+                    status: "pending",
+                    subtotal: 0
+                },
                 createdAt: order.createdAt,
                 deliveryAddress: order.deliveryAddress,
                 payment: order.payment

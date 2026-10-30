@@ -1,4 +1,3 @@
-
 # ─── Reelbite Food Delivery – Docker Compose ─────────────────────────────────
 
 # Services: backend (Express/Socket.IO), frontend (React/Nginx), mongodb
@@ -18,10 +17,6 @@ services:
       - mongo_data:/data/db
     networks:
       - reelbite-net
-    # Expose only on the internal network (not to host) for security
-    # Remove/change the ports mapping below if you need external access
-    # ports:
-    #   - "27017:27017"
 
   # ── Backend (Node.js / Express / Socket.IO) ───────────────────────────────
   backend:
@@ -31,11 +26,13 @@ services:
     container_name: reelbite-backend
     restart: unless-stopped
     env_file:
-      - ./backend/.env
+      - path: ./backend/.env
+        required: false
     environment:
       # Override MONGODB_URL to point to the containerised MongoDB service
       # (must match the key read in config/db.js: process.env.MONGODB_URL)
-      MONGODB_URL: mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD:-secret}@mongodb:27017/reelbite?authSource=admin
+      # If MONGODB_URL is provided in .env (e.g. Atlas), use it; otherwise fall back to local mongodb service
+      MONGODB_URL: ${MONGODB_URL:-mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD:-secret}@mongodb:27017/reelbite?authSource=admin}
       PORT: 5000
     depends_on:
       - mongodb
@@ -44,7 +41,6 @@ services:
       - uploads:/app/public/uploads
     networks:
       - reelbite-net
-    # Expose backend port to host (optional, useful for debugging)
     ports:
       - "5000:5000"
 
@@ -69,7 +65,7 @@ services:
     networks:
       - reelbite-net
     ports:
-      - "80:80"
+      - "${FRONTEND_PORT:-80}:80"
 
 # ─── Named Volumes ────────────────────────────────────────────────────────────
 volumes:

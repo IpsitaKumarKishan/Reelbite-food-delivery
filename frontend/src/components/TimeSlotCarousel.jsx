@@ -61,7 +61,7 @@ export default function TimeSlotCarousel({ timeSlot }) {
           className="flex overflow-x-auto gap-5 pb-3 pt-1 scrollbar-none snap-x scroll-smooth"
         >
           {timeSlot.items.map((item) => (
-            <div key={item._id} className="flex-none snap-start">
+            <div key={item._id} className="flex-none snap-start w-[200px] sm:w-[260px]">
               <FoodCard data={item} />
             </div>
           ))}

@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { IoIosArrowRoundBack } from "react-icons/io";
-import { FaWallet, FaBagShopping, FaChartLine } from "react-icons/fa6";
+import { FaWallet, FaBagShopping, FaRotateRight } from "react-icons/fa6";
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { serverUrl } from '../App';
 import UserOrderCard from '../components/UserOrderCard';
 import OwnerOrderCard from '../components/OwnerOrderCard';
 import { setMyOrders, updateRealtimeOrderStatus } from '../redux/userSlice';
@@ -13,29 +15,56 @@ function MyOrders() {
   const { socket } = useSocket();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const [loading, setLoading] = useState(false);
+
+  const ordersList = Array.isArray(myOrders)
+    ? myOrders
+    : (Array.isArray(myOrders?.data) ? myOrders.data : []);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const result = await axios.get(`${serverUrl}/api/order/my-orders`, { withCredentials: true });
+      dispatch(setMyOrders(result.data));
+    } catch (error) {
+      console.error("Failed to load orders:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    socket?.on('newOrder', (data) => {
-      if (data.shopOrders?.owner._id === userData?._id) {
-        dispatch(setMyOrders([data, ...(myOrders || [])]));
-      }
-    });
+    fetchOrders();
+  }, [userData?._id]);
 
-    socket?.on('update-status', ({ orderId, shopId, status, userId }) => {
-      if (userId === userData?._id) {
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewOrder = (data) => {
+      const ownerId = data.shopOrders?.owner?._id || data.shopOrders?.owner;
+      if (ownerId?.toString() === userData?._id?.toString()) {
+        dispatch(setMyOrders([data, ...ordersList]));
+      }
+    };
+
+    const handleStatusUpdate = ({ orderId, shopId, status, userId }) => {
+      if (userId === userData?._id || userData?.role === "owner") {
         dispatch(updateRealtimeOrderStatus({ orderId, shopId, status }));
       }
-    });
+    };
+
+    socket.on('newOrder', handleNewOrder);
+    socket.on('update-status', handleStatusUpdate);
 
     return () => {
-      socket?.off('newOrder');
-      socket?.off('update-status');
+      socket.off('newOrder', handleNewOrder);
+      socket.off('update-status', handleStatusUpdate);
     };
-  }, [socket, userData, myOrders, dispatch]);
+  }, [socket, userData?._id, userData?.role, ordersList, dispatch]);
 
   // Calculate earnings for Restaurant Owner
   const ownerEarnings = useMemo(() => {
-    if (!myOrders || userData?.role !== "owner") {
+    if (!ordersList.length || userData?.role !== "owner") {
       return { totalRevenue: 0, todayRevenue: 0, deliveredCount: 0 };
     }
 
@@ -46,20 +75,21 @@ function MyOrders() {
     let todayRevenue = 0;
     let deliveredCount = 0;
 
-    myOrders.forEach((order) => {
+    ordersList.forEach((order) => {
+      if (!order) return;
       const shopOrder = order.shopOrders;
       if (shopOrder && shopOrder.status === "delivered") {
         deliveredCount += 1;
         const subtotal = Number(shopOrder.subtotal || 0);
         totalRevenue += subtotal;
-        if (new Date(order.createdAt) >= startOfDay) {
+        if (order.createdAt && new Date(order.createdAt) >= startOfDay) {
           todayRevenue += subtotal;
         }
       }
     });
 
     return { totalRevenue, todayRevenue, deliveredCount };
-  }, [myOrders, userData]);
+  }, [ordersList, userData]);
 
   return (
     <div className='w-full min-h-screen bg-[#fff9f6] flex justify-center px-3 sm:px-4 pb-28 md:pb-16'>
@@ -70,6 +100,7 @@ function MyOrders() {
             <button
               onClick={() => navigate("/")}
               className='p-1.5 rounded-full hover:bg-stone-200/60 transition cursor-pointer'
+              title="Back"
             >
               <IoIosArrowRoundBack size={32} className='text-[#ff5200]' />
             </button>
@@ -77,6 +108,16 @@ function MyOrders() {
               {userData?.role === "owner" ? "Restaurant Orders & Revenue" : "My Orders"}
             </h1>
           </div>
+
+          <button
+            onClick={fetchOrders}
+            disabled={loading}
+            className="px-3.5 py-1.5 rounded-full bg-white hover:bg-stone-50 text-stone-700 border border-stone-200 shadow-xs text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title="Refresh orders"
+          >
+            <FaRotateRight className={`${loading ? "animate-spin text-[#ff5200]" : "text-stone-500"}`} size={12} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
         </div>
 
         {/* Owner Total Earnings Summary Banner */}
@@ -116,17 +157,29 @@ function MyOrders() {
 
         {/* Orders List */}
         <div className='space-y-6'>
-          {myOrders?.length === 0 ? (
-            <div className="text-center py-16 bg-white rounded-3xl border border-stone-200 shadow-sm space-y-2">
+          {loading && ordersList.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <div className="w-8 h-8 border-2 border-stone-300 border-t-[#ff5200] rounded-full animate-spin"></div>
+              <p className="text-xs text-stone-500 font-medium">Fetching orders...</p>
+            </div>
+          ) : ordersList.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-3xl border border-stone-200 shadow-sm space-y-3">
               <FaBagShopping className="mx-auto text-3xl text-stone-400" />
               <p className="text-sm font-bold text-stone-700">No orders found</p>
+              <p className="text-xs text-stone-500">When customers place orders with your kitchen, they will appear here live.</p>
+              <button
+                onClick={fetchOrders}
+                className="mt-2 px-4 py-1.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition cursor-pointer"
+              >
+                Check for new orders
+              </button>
             </div>
           ) : (
-            myOrders?.map((order, index) => (
+            ordersList.map((order, index) => (
               userData?.role === "user" ? (
-                <UserOrderCard data={order} key={index} />
+                <UserOrderCard data={order} key={order?._id || index} />
               ) : userData?.role === "owner" ? (
-                <OwnerOrderCard data={order} key={index} />
+                <OwnerOrderCard data={order} key={order?._id || index} />
               ) : null
             ))
           )}

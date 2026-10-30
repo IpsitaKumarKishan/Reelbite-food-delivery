@@ -262,9 +262,9 @@ function TrackOrderPage() {
                   <div className='bg-stone-50 border border-stone-200/80 rounded-xl p-3 flex items-center justify-between text-xs'>
                     <div>
                       <p className='font-bold text-stone-900'>
-                        Rider: {shopOrder.assignedDeliveryBoy.fullName}
+                        Rider: {shopOrder.assignedDeliveryBoy?.fullName || "Delivery Partner"}
                       </p>
-                      <p className='text-stone-500'>Contact: {shopOrder.assignedDeliveryBoy.mobile}</p>
+                      <p className='text-stone-500'>Contact: {shopOrder.assignedDeliveryBoy?.mobile || "N/A"}</p>
                     </div>
                     <span className='bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[11px]'>
                       On The Way

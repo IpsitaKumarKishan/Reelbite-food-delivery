@@ -158,18 +158,32 @@ const userSlice = createSlice({
     },
 
     setMyOrders: (state, action) => {
-      state.myOrders = action.payload
+      if (Array.isArray(action.payload)) {
+        state.myOrders = action.payload;
+      } else if (Array.isArray(action.payload?.data)) {
+        state.myOrders = action.payload.data;
+      } else if (Array.isArray(action.payload?.orders)) {
+        state.myOrders = action.payload.orders;
+      } else {
+        state.myOrders = [];
+      }
     },
     addMyOrder: (state, action) => {
-      state.myOrders = [action.payload, ...state.myOrders]
+      const existing = Array.isArray(state.myOrders) ? state.myOrders : [];
+      state.myOrders = [action.payload, ...existing];
     },
 
     updateOrderStatus: (state, action) => {
       const { orderId, shopId, status } = action.payload
       const order = state.myOrders.find(o => o._id == orderId)
       if (order) {
-        if (order.shopOrders && order.shopOrders.shop._id == shopId) {
-          order.shopOrders.status = status
+        if (order.shopOrders && (Array.isArray(order.shopOrders) ? order.shopOrders.some(s => (s.shop?._id || s.shop) == shopId) : true)) {
+          if (Array.isArray(order.shopOrders)) {
+            const so = order.shopOrders.find(s => (s.shop?._id || s.shop) == shopId);
+            if (so) so.status = status;
+          } else {
+            order.shopOrders.status = status;
+          }
         }
       }
     },
@@ -178,7 +192,9 @@ const userSlice = createSlice({
       const { orderId, shopId, status } = action.payload
       const order = state.myOrders.find(o => o._id == orderId)
       if (order) {
-        const shopOrder = order.shopOrders.find(so => so.shop._id == shopId)
+        const shopOrder = Array.isArray(order.shopOrders)
+          ? order.shopOrders.find(so => (so.shop?._id || so.shop) == shopId)
+          : order.shopOrders;
         if (shopOrder) {
           shopOrder.status = status
         }

@@ -220,7 +220,7 @@ function UserDashboard() {
               <span className="text-[#ff5200]">🔍</span>
               <span>Search Results ({searchItems.length} items found)</span>
             </h2>
-            <div className="flex flex-wrap gap-6 justify-center">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
               {searchItems.map((item) => (
                 <FoodCard data={item} key={item._id} />
               ))}
@@ -391,7 +391,7 @@ function UserDashboard() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 justify-items-center">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
             {filteredItems && filteredItems.length > 0 ? (
               filteredItems.map((item, index) => (
                 <FoodCard key={item._id || index} data={item} />
