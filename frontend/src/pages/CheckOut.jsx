@@ -17,11 +17,22 @@ import { addMyOrder, clearCart, setTotalAmount } from '../redux/userSlice';
 import CouponSection from '../components/CouponSection';
 import { toast } from 'react-hot-toast';
 
+// Safe default coordinates (Center of India: 20.5937, 78.9629)
+const DEFAULT_LAT = 20.5937;
+const DEFAULT_LON = 78.9629;
+
 function RecenterMap({ location }) {
   const map = useMap()
   useEffect(() => {
-    if (location?.lat && location?.lon) {
-      map.setView([location.lat, location.lon], 16, { animate: true })
+    if (
+      location?.lat !== null &&
+      location?.lat !== undefined &&
+      !isNaN(location.lat) &&
+      location?.lon !== null &&
+      location?.lon !== undefined &&
+      !isNaN(location.lon)
+    ) {
+      map.setView([Number(location.lat), Number(location.lon)], 16, { animate: true })
     }
   }, [location, map])
   return null
@@ -54,42 +65,93 @@ function CheckOut() {
   const deliveryFee = totalAmount > 500 ? 0 : 40
   const AmountWithDeliveryFee = subtotalAfterDiscount + deliveryFee
 
+  // Coordinate fallbacks ensuring map NEVER receives null/NaN coordinates
+  const hasUserCoords =
+    userData?.location?.coordinates &&
+    (userData.location.coordinates[0] !== 0 || userData.location.coordinates[1] !== 0);
+  const userLat = hasUserCoords ? Number(userData.location.coordinates[1]) : null;
+  const userLon = hasUserCoords ? Number(userData.location.coordinates[0]) : null;
 
+  const validMapLat =
+    location?.lat !== null && location?.lat !== undefined && !isNaN(location.lat)
+      ? Number(location.lat)
+      : (userLat || DEFAULT_LAT);
 
-
-
+  const validMapLon =
+    location?.lon !== null && location?.lon !== undefined && !isNaN(location.lon)
+      ? Number(location.lon)
+      : (userLon || DEFAULT_LON);
 
   const onDragEnd = (e) => {
-    const { lat, lng } = e.target._latlng
-    dispatch(setLocation({ lat, lon: lng }))
-    getAddressByLatLng(lat, lng)
+    const latlng = e.target?._latlng || e.target?.getLatLng?.();
+    if (latlng?.lat && latlng?.lng) {
+      dispatch(setLocation({ lat: latlng.lat, lon: latlng.lng }));
+      getAddressByLatLng(latlng.lat, latlng.lng);
+    }
   }
-  const getCurrentLocation = () => {
-      const latitude=userData.location.coordinates[1]
-      const longitude=userData.location.coordinates[0]
-      dispatch(setLocation({ lat: latitude, lon: longitude }))
-      getAddressByLatLng(latitude, longitude)
-   
 
+  const getCurrentLocation = () => {
+    if (navigator?.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const latitude = position.coords.latitude;
+          const longitude = position.coords.longitude;
+          dispatch(setLocation({ lat: latitude, lon: longitude }));
+          getAddressByLatLng(latitude, longitude);
+          toast.success("GPS location updated");
+        },
+        (error) => {
+          console.warn("Geolocation denied or unavailable (expected on HTTP):", error?.message || error);
+          if (hasUserCoords) {
+            dispatch(setLocation({ lat: userLat, lon: userLon }));
+            getAddressByLatLng(userLat, userLon);
+            toast.info("Using saved address location");
+          } else {
+            toast.error("GPS requires HTTPS. Please type your delivery address in the box above.");
+          }
+        },
+        { timeout: 8000, enableHighAccuracy: false }
+      );
+    } else if (hasUserCoords) {
+      dispatch(setLocation({ lat: userLat, lon: userLon }));
+      getAddressByLatLng(userLat, userLon);
+    } else {
+      toast.error("Please type your delivery address in the search box.");
+    }
   }
 
   const getAddressByLatLng = async (lat, lng) => {
+    if (!lat || !lng || !apiKey) return;
     try {
-
-      const result = await axios.get(`https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lng}&format=json&apiKey=${apiKey}`)
-      dispatch(setAddress(result?.data?.results[0].address_line2))
+      const result = await axios.get(`https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lng}&format=json&apiKey=${apiKey}`);
+      const addr = result?.data?.results?.[0]?.address_line2 || result?.data?.results?.[0]?.formatted;
+      if (addr) {
+        dispatch(setAddress(addr));
+        setAddressInput(addr);
+      }
     } catch (error) {
-      console.log(error)
+      console.warn("Reverse geocoding error:", error?.message || error);
     }
   }
 
   const getLatLngByAddress = async () => {
+    if (!addressInput?.trim()) {
+      toast.error("Please enter an address to search");
+      return;
+    }
     try {
-      const result = await axios.get(`https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(addressInput)}&apiKey=${apiKey}`)
-      const { lat, lon } = result.data.features[0].properties
-      dispatch(setLocation({ lat, lon }))
+      const result = await axios.get(`https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(addressInput)}&apiKey=${apiKey}`);
+      const feature = result?.data?.features?.[0];
+      if (feature?.properties) {
+        const { lat, lon } = feature.properties;
+        dispatch(setLocation({ lat, lon }));
+        toast.success("Address location found");
+      } else {
+        toast.error("Could not find coordinates for this address. Please try a different query.");
+      }
     } catch (error) {
-      console.log(error)
+      console.warn("Address search error:", error?.message || error);
+      toast.error("Failed to search address. Please check your internet connection.");
     }
   }
 
@@ -106,9 +168,9 @@ function CheckOut() {
       const result = await axios.post(`${serverUrl}/api/order/place-order`, {
         paymentMethod,
         deliveryAddress: {
-          text: addressInput,
-          latitude: location.lat,
-          longitude: location.lon
+          text: addressInput || "Delivery Address",
+          latitude: validMapLat,
+          longitude: validMapLon
         },
         contactMobile: cleanPhone,
         totalAmount: AmountWithDeliveryFee,
@@ -131,46 +193,47 @@ function CheckOut() {
     }
   }
 
-const openRazorpayWindow=(orderId,razorOrder)=>{
-
-  const options={
-    key:import.meta.env.VITE_RAZORPAY_KEY_ID,
-    amount:razorOrder.amount,
-    currency:'INR',
-    name:"Reelbite",
-    description:"Food Delivery Website",
-    order_id:razorOrder.id,
-    prefill: {
-      name: userData?.fullName || "Customer",
-      email: userData?.email || "customer@example.com",
-      contact: userData?.mobile || "9876543210"
-    },
-    theme: {
-      color: "#ff4d2d"
-    },
-    handler:async function (response) {
-      try {
-        const result=await axios.post(`${serverUrl}/api/order/verify-payment`,{
-          razorpay_payment_id:response.razorpay_payment_id,
-          orderId
-        },{withCredentials:true})
-        dispatch(addMyOrder(result.data))
-        dispatch(clearCart())
-        navigate("/order-placed")
-      } catch (error) {
-        console.log(error)
+  const openRazorpayWindow = (orderId, razorOrder) => {
+    const options = {
+      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+      amount: razorOrder.amount,
+      currency: 'INR',
+      name: "Reelbite",
+      description: "Food Delivery Website",
+      order_id: razorOrder.id,
+      prefill: {
+        name: userData?.fullName || "Customer",
+        email: userData?.email || "customer@example.com",
+        contact: userData?.mobile || "9876543210"
+      },
+      theme: {
+        color: "#ff4d2d"
+      },
+      handler: async function (response) {
+        try {
+          const result = await axios.post(`${serverUrl}/api/order/verify-payment`, {
+            razorpay_payment_id: response.razorpay_payment_id,
+            orderId
+          }, { withCredentials: true })
+          dispatch(addMyOrder(result.data))
+          dispatch(clearCart())
+          navigate("/order-placed")
+        } catch (error) {
+          console.log(error)
+        }
       }
     }
+
+    const rzp = new window.Razorpay(options)
+    rzp.open()
   }
 
-  const rzp=new window.Razorpay(options)
-  rzp.open()
-}
-
-
   useEffect(() => {
-    setAddressInput(address)
+    if (address && !addressInput) {
+      setAddressInput(address)
+    }
   }, [address])
+
   return (
     <div className='min-h-screen bg-[#fff9f6] flex items-center justify-center p-3 sm:p-6 pb-28 md:pb-12 relative'>
       <div className='absolute top-4 left-4 sm:top-6 sm:left-6 z-[10] cursor-pointer' onClick={() => navigate("/")}>
@@ -182,25 +245,46 @@ const openRazorpayWindow=(orderId,razorOrder)=>{
         <section>
           <h2 className='text-lg font-semibold mb-2 flex items-center gap-2 text-gray-800'><IoLocationSharp className='text-[#ff4d2d]' /> Delivery Location</h2>
           <div className='flex gap-2 mb-3'>
-            <input type="text" className='flex-1 border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff4d2d]' placeholder='Enter Your Delivery Address..' value={addressInput} onChange={(e) => setAddressInput(e.target.value)} />
-            <button className='bg-[#ff4d2d] hover:bg-[#e64526] text-white px-3 py-2 rounded-lg flex items-center justify-center' onClick={getLatLngByAddress}><IoSearchOutline size={17} /></button>
-            <button className='bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg flex items-center justify-center' onClick={getCurrentLocation}><TbCurrentLocation size={17} /></button>
+            <input
+              type="text"
+              className='flex-1 border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff4d2d]'
+              placeholder='Enter Your Delivery Address..'
+              value={addressInput}
+              onChange={(e) => setAddressInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); getLatLngByAddress(); } }}
+            />
+            <button
+              className='bg-[#ff4d2d] hover:bg-[#e64526] text-white px-3 py-2 rounded-lg flex items-center justify-center transition'
+              onClick={getLatLngByAddress}
+              title="Search address"
+            >
+              <IoSearchOutline size={17} />
+            </button>
+            <button
+              className='bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg flex items-center justify-center transition'
+              onClick={getCurrentLocation}
+              title="Get current GPS / saved location"
+            >
+              <TbCurrentLocation size={17} />
+            </button>
           </div>
           <div className='rounded-xl border overflow-hidden'>
             <div className='h-64 w-full flex items-center justify-center'>
               <MapContainer
                 className={"w-full h-full"}
-                center={[location?.lat, location?.lon]}
-                zoom={16}
+                center={[validMapLat, validMapLon]}
+                zoom={14}
               >
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
-                <RecenterMap location={location} />
-                <Marker position={[location?.lat, location?.lon]} draggable eventHandlers={{ dragend: onDragEnd }} />
-
-
+                <RecenterMap location={{ lat: validMapLat, lon: validMapLon }} />
+                <Marker
+                  position={[validMapLat, validMapLon]}
+                  draggable
+                  eventHandlers={{ dragend: onDragEnd }}
+                />
               </MapContainer>
             </div>
           </div>
@@ -254,7 +338,7 @@ const openRazorpayWindow=(orderId,razorOrder)=>{
               <span className='inline-flex h-10 w-10 items-center justify-center rounded-full bg-green-100'>
                 <MdDeliveryDining className='text-green-600 text-xl' />
               </span>
-              <div >
+              <div>
                 <p className='font-medium text-gray-800'>Cash On Delivery</p>
                 <p className='text-xs text-gray-500'>Pay when your food arrives</p>
               </div>
@@ -289,40 +373,48 @@ const openRazorpayWindow=(orderId,razorOrder)=>{
 
         <section>
           <h2 className='text-lg font-semibold mb-3 text-gray-800'>Order Summary</h2>
-<div className='rounded-xl border bg-gray-50 p-4 space-y-2'>
-{cartItems.map((item,index)=>(
-  <div key={index} className='flex justify-between text-sm text-gray-700'>
-<span>{item.name} x {item.quantity}</span>
-<span>₹{item.price*item.quantity}</span>
-  </div>
- 
-))}
- <hr className='border-gray-200 my-2'/>
-<div className='flex justify-between font-medium text-gray-800'>
-  <span>Subtotal</span>
-  <span>₹{totalAmount}</span>
-</div>
-{appliedCoupon && (
-  <div className='flex justify-between text-emerald-600 font-semibold text-sm'>
-    <span>Coupon Discount ({appliedCoupon.code})</span>
-    <span>-₹{appliedCoupon.discountAmount}</span>
-  </div>
-)}
-<div className='flex justify-between text-gray-700 text-sm'>
-  <span>Delivery Fee</span>
-  <span>{deliveryFee==0?"Free":`₹${deliveryFee}`}</span>
-</div>
-<div className='flex justify-between text-gray-700 text-sm'>
-  <span>Platform Fee</span>
-  <span className='text-green-600 font-semibold'>₹0 (Free)</span>
-</div>
-<div className='flex justify-between text-lg font-bold text-[#ff4d2d] pt-2 border-t border-gray-200'>
-    <span>Total Amount</span>
-  <span>₹{AmountWithDeliveryFee}</span>
-</div>
-</div>
+          <div className='rounded-xl border bg-gray-50 p-4 space-y-2'>
+            {cartItems && cartItems.length > 0 ? (
+              cartItems.map((item, index) => (
+                <div key={index} className='flex justify-between text-sm text-gray-700'>
+                  <span>{item.name} x {item.quantity}</span>
+                  <span>₹{item.price * item.quantity}</span>
+                </div>
+              ))
+            ) : (
+              <p className='text-sm text-gray-500 italic py-1'>No items in cart</p>
+            )}
+            <hr className='border-gray-200 my-2' />
+            <div className='flex justify-between font-medium text-gray-800'>
+              <span>Subtotal</span>
+              <span>₹{totalAmount}</span>
+            </div>
+            {appliedCoupon && (
+              <div className='flex justify-between text-emerald-600 font-semibold text-sm'>
+                <span>Coupon Discount ({appliedCoupon.code})</span>
+                <span>-₹{appliedCoupon.discountAmount}</span>
+              </div>
+            )}
+            <div className='flex justify-between text-gray-700 text-sm'>
+              <span>Delivery Fee</span>
+              <span>{deliveryFee === 0 ? "Free" : `₹${deliveryFee}`}</span>
+            </div>
+            <div className='flex justify-between text-gray-700 text-sm'>
+              <span>Platform Fee</span>
+              <span className='text-green-600 font-semibold'>₹0 (Free)</span>
+            </div>
+            <div className='flex justify-between text-lg font-bold text-[#ff4d2d] pt-2 border-t border-gray-200'>
+              <span>Total Amount</span>
+              <span>₹{AmountWithDeliveryFee}</span>
+            </div>
+          </div>
         </section>
-        <button className='w-full bg-[#ff4d2d] hover:bg-[#e64526] text-white py-3 rounded-xl font-semibold' onClick={handlePlaceOrder}> {paymentMethod=="cod"?"Place Order":"Pay & Place Order"}</button>
+        <button
+          className='w-full bg-[#ff4d2d] hover:bg-[#e64526] text-white py-3 rounded-xl font-semibold transition'
+          onClick={handlePlaceOrder}
+        >
+          {paymentMethod === "cod" ? "Place Order" : "Pay & Place Order"}
+        </button>
 
       </div>
     </div>

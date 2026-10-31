@@ -1,16 +1,23 @@
 import axios from 'axios'
 import React, { useEffect } from 'react'
-import { serverUrl } from '../App'
 import { useDispatch, useSelector } from 'react-redux'
-import {  setCurrentAddress, setCurrentCity, setCurrentState, setUserData } from '../redux/userSlice'
+import { setCurrentAddress, setCurrentCity, setCurrentState } from '../redux/userSlice'
 import { setAddress, setLocation } from '../redux/mapSlice'
 
 function useGetCity() {
-    const dispatch=useDispatch()
-    const {userData}=useSelector(state=>state.user)
-    const apiKey=import.meta.env.VITE_GEOAPIKEY
+    const dispatch = useDispatch()
+    const { userData } = useSelector(state => state.user)
+    const apiKey = import.meta.env.VITE_GEOAPIKEY
+
     useEffect(() => {
-        if (!navigator.geolocation) return;
+        // If user already has location saved in profile, populate coordinates immediately
+        if (userData?.location?.coordinates && (userData.location.coordinates[0] !== 0 || userData.location.coordinates[1] !== 0)) {
+            const latitude = userData.location.coordinates[1];
+            const longitude = userData.location.coordinates[0];
+            dispatch(setLocation({ lat: latitude, lon: longitude }));
+        }
+
+        if (!navigator?.geolocation) return;
 
         navigator.geolocation.getCurrentPosition(
             async (position) => {
@@ -40,9 +47,10 @@ function useGetCity() {
                 }
             },
             (err) => {
+                // Expected on non-HTTPS origins (like direct EC2 IP)
                 console.warn("Geolocation denied or unavailable:", err?.message || err);
             },
-            { timeout: 10000, enableHighAccuracy: false }
+            { timeout: 8000, enableHighAccuracy: false }
         );
     }, [userData]);
 }
