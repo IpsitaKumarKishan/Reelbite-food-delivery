@@ -7,9 +7,11 @@ import { sendOtpMail } from "../utils/mail.js"
 import { validatePhoneNumber } from "../utils/phoneValidator.js"
 import { sendPhoneOtpSms, verifyTwilioOtp } from "../utils/smsService.js"
 
+const isSecureCookie = process.env.COOKIE_SECURE === "true" || (process.env.NODE_ENV === "production" && process.env.FRONTEND_URL && process.env.FRONTEND_URL.startsWith("https://"));
+
 const COOKIE_OPTIONS = {
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    secure: isSecureCookie,
+    sameSite: isSecureCookie ? "none" : "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true
 };
@@ -272,8 +274,8 @@ export const signOut = async (req, res) => {
     try {
         res.clearCookie("token", {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
+            secure: COOKIE_OPTIONS.secure,
+            sameSite: COOKIE_OPTIONS.sameSite
         })
         return res.status(200).json({ message: "log out successfully" })
     } catch (error) {

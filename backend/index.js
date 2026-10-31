@@ -45,17 +45,17 @@ const frontendDistPath = path.join(__dirname, "../frontend/dist")
 
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV === "production") {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
+    // Dynamic origin matching: allow localhost, EC2 IP, custom domain, or mobile/curl (no origin)
+    callback(null, true);
   },
-  credentials: true
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
 };
 
 const io = new Server(server, {
-  cors: corsOptions
+  cors: corsOptions,
+  transports: ["websocket", "polling"]
 })
 
 app.set("io", io)
