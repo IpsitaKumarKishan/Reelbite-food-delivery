@@ -29,6 +29,7 @@ RUN npm ci
 
 # Copy all source files and build
 COPY . .
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN npm run build
 
 # ── Stage 2: Serve the static build with Nginx ────────────────────────────────
