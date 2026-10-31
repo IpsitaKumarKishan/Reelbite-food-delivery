@@ -91,6 +91,29 @@ function CheckOut() {
   }
 
   const getCurrentLocation = () => {
+    const fetchIpLocation = async () => {
+      if (!apiKey) {
+        toast.error("Please enter your delivery address above.");
+        return;
+      }
+      try {
+        const ipRes = await axios.get(`https://api.geoapify.com/v1/ipinfo?apiKey=${apiKey}`);
+        if (ipRes?.data?.location) {
+          const lat = ipRes.data.location.latitude;
+          const lon = ipRes.data.location.longitude;
+          const detectedCity = ipRes.data.city?.name;
+          const detectedState = ipRes.data.state?.name;
+          dispatch(setLocation({ lat, lon }));
+          const addr = detectedCity ? `${detectedCity}, ${detectedState || ""}` : "Delivery Location";
+          dispatch(setAddress(addr));
+          setAddressInput(addr);
+          toast.success(`Location detected: ${detectedCity || "Current City"}`);
+        }
+      } catch (err) {
+        toast.error("Could not detect IP location. Please type your delivery address above.");
+      }
+    };
+
     if (navigator?.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -101,22 +124,22 @@ function CheckOut() {
           toast.success("GPS location updated");
         },
         (error) => {
-          console.warn("Geolocation denied or unavailable (expected on HTTP):", error?.message || error);
+          console.warn("GPS unavailable or blocked on HTTP. Falling back to IP Geolocation:", error?.message || error);
           if (hasUserCoords) {
             dispatch(setLocation({ lat: userLat, lon: userLon }));
             getAddressByLatLng(userLat, userLon);
             toast.info("Using saved address location");
           } else {
-            toast.error("GPS requires HTTPS. Please type your delivery address in the box above.");
+            fetchIpLocation();
           }
         },
-        { timeout: 8000, enableHighAccuracy: false }
+        { timeout: 5000, enableHighAccuracy: false }
       );
     } else if (hasUserCoords) {
       dispatch(setLocation({ lat: userLat, lon: userLon }));
       getAddressByLatLng(userLat, userLon);
     } else {
-      toast.error("Please type your delivery address in the search box.");
+      fetchIpLocation();
     }
   }
 

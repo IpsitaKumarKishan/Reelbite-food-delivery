@@ -17,7 +17,38 @@ function useGetCity() {
             dispatch(setLocation({ lat: latitude, lon: longitude }));
         }
 
-        if (!navigator?.geolocation) return;
+        const fetchIpLocationFallback = async () => {
+            if (!apiKey) return;
+            try {
+                const ipRes = await axios.get(`https://api.geoapify.com/v1/ipinfo?apiKey=${apiKey}`);
+                if (ipRes?.data?.location) {
+                    const lat = ipRes.data.location.latitude;
+                    const lon = ipRes.data.location.longitude;
+                    const detectedCity = ipRes.data.city?.name;
+                    const detectedState = ipRes.data.state?.name;
+
+                    if (lat && lon) {
+                        dispatch(setLocation({ lat, lon }));
+                    }
+                    if (detectedCity) {
+                        dispatch(setCurrentCity(detectedCity));
+                    }
+                    if (detectedState) {
+                        dispatch(setCurrentState(detectedState));
+                    }
+                    const addr = detectedCity ? `${detectedCity}, ${detectedState || ""}` : "Delivery Location";
+                    dispatch(setCurrentAddress(addr));
+                    dispatch(setAddress(addr));
+                }
+            } catch (err) {
+                console.warn("IP Geolocation fallback failed:", err?.message || err);
+            }
+        };
+
+        if (!navigator?.geolocation) {
+            fetchIpLocationFallback();
+            return;
+        }
 
         navigator.geolocation.getCurrentPosition(
             async (position) => {
@@ -48,11 +79,12 @@ function useGetCity() {
             },
             (err) => {
                 // Expected on non-HTTPS origins (like direct EC2 IP)
-                console.warn("Geolocation denied or unavailable:", err?.message || err);
+                console.warn("Browser GPS blocked or unavailable on HTTP. Using IP Geolocation fallback:", err?.message || err);
+                fetchIpLocationFallback();
             },
-            { timeout: 8000, enableHighAccuracy: false }
+            { timeout: 5000, enableHighAccuracy: false }
         );
-    }, [userData]);
+    }, [userData, apiKey, dispatch]);
 }
 
 export default useGetCity
