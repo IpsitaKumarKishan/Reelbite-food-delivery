@@ -127,10 +127,6 @@ function SignUp() {
       setErr(phoneRes.msg);
       return false;
     }
-    if (!isPhoneVerified) {
-      setErr('Please verify your mobile number with OTP before completing registration.');
-      return false;
-    }
     if (!password || password.length < 6) {
       setErr('Password must be at least 6 characters.');
       return false;
@@ -361,117 +357,20 @@ function SignUp() {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-bold text-stone-700">Mobile Number</label>
-              {isPhoneVerified && (
-                <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Verified
-                </span>
-              )}
             </div>
             <div className="relative flex items-center">
               <span className="absolute left-3.5 text-xs font-bold text-stone-400">+91</span>
               <input
                 type="tel"
                 maxLength={10}
-                disabled={isPhoneVerified}
                 value={mobile}
-                onChange={(e) => {
-                  setMobile(e.target.value.replace(/\D/g, '').slice(0, 10));
-                  setIsPhoneVerified(false);
-                  setOtpSent(false);
-                }}
+                onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
                 placeholder="9876543210"
                 autoComplete="tel"
-                className={`w-full rounded-xl border ${
-                  isPhoneVerified
-                    ? 'border-emerald-300 bg-emerald-50/20'
-                    : 'border-stone-200 bg-stone-50/50'
-                } py-2.5 pl-12 pr-28 text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20`}
+                className="w-full rounded-xl border border-stone-200 bg-stone-50/50 py-2.5 pl-12 pr-4 text-xs sm:text-sm font-medium text-stone-900 outline-none transition focus:border-[#ff5200] focus:bg-white focus:ring-2 focus:ring-[#ff5200]/20"
                 required
               />
-              {!isPhoneVerified ? (
-                <button
-                  type="button"
-                  onClick={handleSendPhoneOtp}
-                  disabled={sendingOtp || otpTimer > 0 || mobile.replace(/\D/g, '').length !== 10}
-                  className="absolute right-2 px-3 py-1.5 rounded-lg bg-[#ff5200] text-white text-xs font-bold hover:bg-[#e04800] transition active:scale-95 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
-                >
-                  {sendingOtp ? (
-                    <ClipLoader size={12} color="#ffffff" />
-                  ) : otpTimer > 0 ? (
-                    `Resend (${otpTimer}s)`
-                  ) : otpSent ? (
-                    'Resend OTP'
-                  ) : (
-                    'Send OTP'
-                  )}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsPhoneVerified(false);
-                    setOtpSent(false);
-                    setPhoneOtp('');
-                  }}
-                  className="absolute right-3 text-xs font-bold text-stone-400 hover:text-stone-700 underline cursor-pointer"
-                >
-                  Change
-                </button>
-              )}
             </div>
-
-            {/* OTP Input Card when OTP is sent & not verified */}
-            <AnimatePresence>
-              {otpSent && !isPhoneVerified && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0, y: -6 }}
-                  animate={{ opacity: 1, height: 'auto', y: 0 }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mt-2.5 p-3 rounded-2xl bg-orange-50/80 border border-orange-200/80 space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-stone-700 flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4 text-[#ff5200]" />
-                      Enter 6-digit OTP sent to +91 {mobile}
-                    </span>
-                  </div>
-
-                  {devOtp && (
-                    <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-semibold">
-                      <span>🛠️ Dev OTP: <strong className="font-mono text-[#ff5200] bg-white px-1.5 py-0.5 rounded border border-amber-200">{devOtp}</strong></span>
-                      <button
-                        type="button"
-                        onClick={() => setPhoneOtp(devOtp)}
-                        className="text-[10px] font-extrabold text-[#ff5200] hover:underline"
-                      >
-                        Auto-fill
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      maxLength={6}
-                      value={phoneOtp}
-                      onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="123456"
-                      autoFocus
-                      className="flex-1 rounded-xl border border-stone-300 bg-white py-2 px-3 text-center text-sm font-black tracking-widest text-stone-900 outline-none focus:border-[#ff5200] focus:ring-2 focus:ring-[#ff5200]/20"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleVerifyPhoneOtp}
-                      disabled={verifyingOtp || phoneOtp.length !== 6}
-                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#ff4d2d] to-amber-500 text-white text-xs font-extrabold shadow hover:opacity-95 active:scale-95 disabled:opacity-40 cursor-pointer"
-                    >
-                      {verifyingOtp ? <ClipLoader size={14} color="#ffffff" /> : 'Verify'}
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
 
           <div>

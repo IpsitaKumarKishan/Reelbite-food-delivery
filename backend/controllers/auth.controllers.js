@@ -160,8 +160,9 @@ export const signUp = async (req, res) => {
         const cleanMobile = phoneValidation.normalizedMobile
 
         // Validation Layer: Ensure phone was verified via OTP
-        const verifiedOtp = await PhoneOtp.findOne({ mobile: cleanMobile, verified: true });
-        if (!verifiedOtp && process.env.BYPASS_PHONE_OTP !== "true") {
+        // Validation Layer: Phone OTP requirement bypassed for now
+        // const verifiedOtp = await PhoneOtp.findOne({ mobile: cleanMobile, verified: true });
+        if (false) {
             return res.status(400).json({ message: "Please verify your mobile number with OTP before completing registration." });
         }
 
