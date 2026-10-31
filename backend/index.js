@@ -19,6 +19,8 @@ import couponRouter from "./routes/coupon.routes.js"
 import reviewRouter from "./routes/review.routes.js"
 import analyticsRouter from "./routes/analytics.routes.js"
 import adminRouter from "./routes/admin.routes.js"
+import queueRouter from "./routes/queue.routes.js"
+import { initOrderWorker } from "./workers/order.worker.js"
 import http from "http"
 import { Server } from "socket.io"
 import { socketHandler } from "./socket.js"
@@ -104,7 +106,10 @@ app.use("/api/reviews",reviewRouter)
 app.use("/api/analytics",analyticsRouter)
 app.use("/api/admin",adminRouter)
 
+app.use("/api/queue", queueRouter)
+
 socketHandler(io)
+initOrderWorker(io)
 
 // Serve frontend static files if dist exists (Single-Server / Monolithic setup)
 if (fs.existsSync(frontendDistPath)) {

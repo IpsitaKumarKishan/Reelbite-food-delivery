@@ -8,6 +8,7 @@ import { sendDeliveryOtpMail } from "../utils/mail.js"
 import RazorPay from "razorpay"
 import dotenv from "dotenv"
 import { computeOrderSplit } from "../utils/orderSplit.js"
+import { enqueueOrderProcessing } from "../queues/order.queue.js"
 
 dotenv.config()
 let instance = new RazorPay({
@@ -213,32 +214,41 @@ export const placeOrder = async (req, res) => {
             await matchedCoupon.save();
         }
 
-        await newOrder.populate("shopOrders.shopOrderItems.item", "name image price")
-        await newOrder.populate("shopOrders.shop", "name")
-        await newOrder.populate("shopOrders.owner", "name socketId")
-        await newOrder.populate("user", "fullName email mobile")
+        // Cloud Scalability: Asynchronously enqueue order background jobs
+        const queueResult = await enqueueOrderProcessing({
+            orderId: newOrder._id.toString(),
+            totalAmount: newOrder.totalAmount,
+            paymentMethod: newOrder.paymentMethod
+        });
 
-        const io = req.app.get('io')
+        // Fallback for local development if Redis queue is offline
+        if (!queueResult.queued) {
+            await newOrder.populate("shopOrders.shopOrderItems.item", "name image price");
+            await newOrder.populate("shopOrders.shop", "name");
+            await newOrder.populate("shopOrders.owner", "name socketId");
+            await newOrder.populate("user", "fullName email mobile");
 
-        if (io) {
-            newOrder.shopOrders.forEach(shopOrder => {
-                const ownerSocketId = shopOrder.owner.socketId
-                if (ownerSocketId) {
-                    io.to(ownerSocketId).emit('newOrder', {
-                        _id: newOrder._id,
-                        paymentMethod: newOrder.paymentMethod,
-                        user: newOrder.user || {
-                            fullName: "Customer",
-                            email: "N/A",
-                            mobile: newOrder.contactMobile || "N/A"
-                        },
-                        shopOrders: shopOrder,
-                        createdAt: newOrder.createdAt,
-                        deliveryAddress: newOrder.deliveryAddress,
-                        payment: newOrder.payment
-                    })
-                }
-            });
+            const io = req.app.get('io');
+            if (io) {
+                newOrder.shopOrders.forEach(shopOrder => {
+                    const ownerSocketId = shopOrder.owner?.socketId;
+                    if (ownerSocketId) {
+                        io.to(ownerSocketId).emit('newOrder', {
+                            _id: newOrder._id,
+                            paymentMethod: newOrder.paymentMethod,
+                            user: newOrder.user || {
+                                fullName: "Customer",
+                                email: "N/A",
+                                mobile: newOrder.contactMobile || "N/A"
+                            },
+                            shopOrders: shopOrder,
+                            createdAt: newOrder.createdAt,
+                            deliveryAddress: newOrder.deliveryAddress,
+                            payment: newOrder.payment
+                        });
+                    }
+                });
+            }
         }
 
         await User.findByIdAndUpdate(req.userId, { cart: [] });
@@ -287,34 +297,42 @@ export const verifyPayment = async (req, res) => {
             );
         }
 
-        await order.populate("shopOrders.shopOrderItems.item", "name image price")
-        await order.populate("shopOrders.shop", "name")
-        await order.populate("shopOrders.owner", "name socketId")
-        await order.populate("user", "fullName email mobile")
+        // Cloud Scalability: Asynchronously enqueue order background jobs
+        const queueResult = await enqueueOrderProcessing({
+            orderId: order._id.toString(),
+            totalAmount: order.totalAmount,
+            paymentMethod: order.paymentMethod
+        });
 
-        const io = req.app.get('io')
+        // Fallback for local development if Redis queue is offline
+        if (!queueResult.queued) {
+            await order.populate("shopOrders.shopOrderItems.item", "name image price");
+            await order.populate("shopOrders.shop", "name");
+            await order.populate("shopOrders.owner", "name socketId");
+            await order.populate("user", "fullName email mobile");
 
-        if (io) {
-            order.shopOrders.forEach(shopOrder => {
-                const ownerSocketId = shopOrder.owner.socketId
-                if (ownerSocketId) {
-                    io.to(ownerSocketId).emit('newOrder', {
-                        _id: order._id,
-                        paymentMethod: order.paymentMethod,
-                        user: order.user || {
-                            fullName: "Customer",
-                            email: "N/A",
-                            mobile: order.contactMobile || "N/A"
-                        },
-                        shopOrders: shopOrder,
-                        createdAt: order.createdAt,
-                        deliveryAddress: order.deliveryAddress,
-                        payment: order.payment
-                    })
-                }
-            });
+            const io = req.app.get('io');
+            if (io) {
+                order.shopOrders.forEach(shopOrder => {
+                    const ownerSocketId = shopOrder.owner?.socketId;
+                    if (ownerSocketId) {
+                        io.to(ownerSocketId).emit('newOrder', {
+                            _id: order._id,
+                            paymentMethod: order.paymentMethod,
+                            user: order.user || {
+                                fullName: "Customer",
+                                email: "N/A",
+                                mobile: order.contactMobile || "N/A"
+                            },
+                            shopOrders: shopOrder,
+                            createdAt: order.createdAt,
+                            deliveryAddress: order.deliveryAddress,
+                            payment: order.payment
+                        });
+                    }
+                });
+            }
         }
-
 
         return res.status(200).json(order)
 

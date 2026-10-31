@@ -1,20 +1,19 @@
 # ─── Reelbite Food Delivery – Docker Compose ─────────────────────────────────
 
-# Services: backend (Express/Socket.IO), frontend (React/Nginx), mongodb
+# Services: backend (Express/Socket.IO), frontend (React/Nginx), redis
+# Database: MongoDB Atlas (Cloud Managed Database)
 
 services:
 
-  # ── MongoDB ──────────────────────────────────────────────────────────────────
-  mongodb:
-    image: mongo:7-jammy
-    container_name: reelbite-mongodb
+  # ── Redis (Event Queue Broker for BullMQ) ────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: reelbite-redis
     restart: unless-stopped
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-secret}
-      MONGO_INITDB_DATABASE: reelbite
+    ports:
+      - "6379:6379"
     volumes:
-      - mongo_data:/data/db
+      - redis_data:/data
     networks:
       - reelbite-net
 
@@ -29,13 +28,12 @@ services:
       - path: ./backend/.env
         required: false
     environment:
-      # Override MONGODB_URL to point to the containerised MongoDB service
-      # (must match the key read in config/db.js: process.env.MONGODB_URL)
-      # If MONGODB_URL is provided in .env (e.g. Atlas), use it; otherwise fall back to local mongodb service
-      MONGODB_URL: ${MONGODB_URL:-mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD:-secret}@mongodb:27017/reelbite?authSource=admin}
+      # Connects directly to MongoDB Atlas Cloud Database
+      MONGODB_URL: ${MONGODB_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       PORT: 5000
     depends_on:
-      - mongodb
+      - redis
     volumes:
       # Persist uploaded files across container restarts
       - uploads:/app/public/uploads
@@ -69,8 +67,8 @@ services:
 
 # ─── Named Volumes ────────────────────────────────────────────────────────────
 volumes:
-  mongo_data:
   uploads:
+  redis_data:
 
 # ─── Networks ─────────────────────────────────────────────────────────────────
 networks:
