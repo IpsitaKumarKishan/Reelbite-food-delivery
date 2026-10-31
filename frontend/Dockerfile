@@ -25,7 +25,7 @@ ENV VITE_GEOAPIKEY=$VITE_GEOAPIKEY
 ENV VITE_RAZORPAY_KEY_ID=$VITE_RAZORPAY_KEY_ID
 
 COPY package*.json ./
-RUN npm ci
+RUN npm ci && npm cache clean --force
 
 # Copy all source files and build
 COPY . .

@@ -17,13 +17,13 @@ WORKDIR /app
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 # Copy installed modules from the deps stage
-COPY --from=deps /app/node_modules ./node_modules
+COPY --chown=appuser:appgroup --from=deps /app/node_modules ./node_modules
 
 # Copy application source code
-COPY . .
+COPY --chown=appuser:appgroup . .
 
 # Ensure multer's upload directory exists and is owned by the app user
-RUN mkdir -p public/uploads && chown -R appuser:appgroup /app
+RUN mkdir -p public/uploads && chown -R appuser:appgroup public/uploads
 
 USER appuser
 
