@@ -24,8 +24,10 @@ import {
   FaUserGear,
   FaCircleCheck,
   FaTrashCan,
+  FaGaugeHigh
 } from "react-icons/fa6";
 import toast from "react-hot-toast";
+import InfrastructureMonitoring from "../components/InfrastructureMonitoring";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -47,7 +49,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam && ["overview", "shops", "users", "disputes"].includes(tabParam)) {
+    if (tabParam && ["overview", "shops", "users", "disputes", "infrastructure"].includes(tabParam)) {
       setActiveTab(tabParam);
     }
     const filterParam = searchParams.get("filter");
@@ -393,6 +395,18 @@ export default function AdminDashboard() {
           >
             <FaTriangleExclamation size={14} />
             <span>Disputes & Refunds ({disputes.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("infrastructure")}
+            className={`px-5 py-3 rounded-2xl text-xs sm:text-sm font-extrabold transition flex items-center gap-2 shrink-0 ${
+              activeTab === "infrastructure"
+                ? "bg-[#ff5200] text-white shadow-md shadow-orange-500/20"
+                : "text-stone-600 hover:bg-stone-100"
+            }`}
+          >
+            <FaGaugeHigh size={14} />
+            <span>Cloud Scaling & Queues</span>
           </button>
         </div>
 
@@ -901,6 +915,9 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* TAB 5: Cloud Infrastructure & Dynamic Concurrency Control */}
+        {activeTab === "infrastructure" && <InfrastructureMonitoring />}
       </main>
     </div>
   );

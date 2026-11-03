@@ -100,5 +100,45 @@ export const getQueueMetrics = async () => {
   }
 };
 
+/**
+ * Retrieve failed jobs stored in Dead Letter Queue (DLQ)
+ * @param {number} start 
+ * @param {number} count 
+ */
+export const getDeadLetterJobs = async (start = 0, count = 20) => {
+  if (!orderQueue) return [];
+  try {
+    const jobs = await orderQueue.getJobs(["failed"], start, start + count - 1, true);
+    return jobs.map((j) => ({
+      id: j.id,
+      name: j.name,
+      data: j.data,
+      attemptsMade: j.attemptsMade,
+      failedReason: j.failedReason,
+      timestamp: j.timestamp,
+      finishedOn: j.finishedOn,
+      stacktrace: j.stacktrace ? j.stacktrace.slice(0, 2) : []
+    }));
+  } catch (err) {
+    return [];
+  }
+};
+
+/**
+ * Manually retry a failed job residing in DLQ
+ * @param {string} jobId 
+ */
+export const retryDeadLetterJob = async (jobId) => {
+  if (!orderQueue) return { success: false, reason: "Queue not initialized" };
+  try {
+    const job = await orderQueue.getJob(jobId);
+    if (!job) return { success: false, reason: `Job ${jobId} not found` };
+    await job.retry();
+    return { success: true, jobId };
+  } catch (err) {
+    return { success: false, reason: err.message };
+  }
+};
+
 export { orderQueue };
 

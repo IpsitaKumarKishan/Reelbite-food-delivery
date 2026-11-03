@@ -14,11 +14,15 @@ import {
 } from "../controllers/admin.controllers.js";
 import isAuth from "../middlewares/isAuth.js";
 import isAdmin from "../middlewares/isAdmin.js";
+import infrastructureRouter from "./infrastructure.routes.js";
 
 const adminRouter = express.Router();
 
 // Apply isAuth and isAdmin to all admin routes
 adminRouter.use(isAuth, isAdmin);
+
+// Cloud Infrastructure & Adaptive Concurrency Telemetry
+adminRouter.use("/infrastructure", infrastructureRouter);
 
 adminRouter.get("/quick-badges", getQuickBadges);
 adminRouter.get("/metrics", getPlatformMetrics);

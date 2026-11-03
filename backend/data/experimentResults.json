@@ -1,0 +1,59 @@
+{
+  "metadata": {
+    "timestamp": "2026-11-03T07:24:55.728Z",
+    "workloadJobs": 30,
+    "platform": "win32",
+    "arch": "x64",
+    "nodeVersion": "v22.15.1"
+  },
+  "comparativeAnalysis": [
+    {
+      "experiment": "Experiment A: Baseline (Fixed C=1)",
+      "mode": "fixed",
+      "jobCount": 30,
+      "totalDurationMs": 1824,
+      "throughputJobsPerSec": 16.45,
+      "avgQueueWaitTimeMs": 896,
+      "avgJobProcessingTimeMs": 46,
+      "p95LatencyMs": 1778,
+      "systemCpuPercent": 20.1,
+      "systemMemoryPercent": 56.72,
+      "failurePercent": 0,
+      "dynamicAdjustments": 0,
+      "peakConcurrency": 1
+    },
+    {
+      "experiment": "Experiment B: Fixed Multi-Worker (Fixed C=5)",
+      "mode": "fixed",
+      "jobCount": 30,
+      "totalDurationMs": 354,
+      "throughputJobsPerSec": 84.75,
+      "avgQueueWaitTimeMs": 132,
+      "avgJobProcessingTimeMs": 47,
+      "p95LatencyMs": 322,
+      "systemCpuPercent": 20.1,
+      "systemMemoryPercent": 56.72,
+      "failurePercent": 0,
+      "dynamicAdjustments": 0,
+      "peakConcurrency": 5
+    },
+    {
+      "experiment": "Experiment C: Resource-Aware Adaptive Concurrency",
+      "mode": "adaptive",
+      "jobCount": 30,
+      "totalDurationMs": 264,
+      "throughputJobsPerSec": 113.64,
+      "avgQueueWaitTimeMs": 88,
+      "avgJobProcessingTimeMs": 45,
+      "p95LatencyMs": 249,
+      "systemCpuPercent": 20.1,
+      "systemMemoryPercent": 56.72,
+      "failurePercent": 0,
+      "dynamicAdjustments": 2,
+      "peakConcurrency": 6
+    }
+  ],
+  "speedupOverBaseline": 6.91,
+  "speedupOverFixed": 1.34,
+  "latencyReductionPercent": 22.7
+}

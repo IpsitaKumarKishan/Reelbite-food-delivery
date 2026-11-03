@@ -1,23 +1,28 @@
 # ─── Reelbite Food Delivery – Docker Compose ─────────────────────────────────
-
-# Services: backend (Express/Socket.IO), frontend (React/Nginx), redis
+# Services: backend (Express/Socket.IO), frontend (React/Nginx), redis, worker (optional)
 # Database: MongoDB Atlas (Cloud Managed Database)
+# Feature: Resource-Aware Adaptive Concurrency Control for Distributed Job Processing
 
 services:
 
-  # ── Redis (Event Queue Broker for BullMQ) ────────────────────────────────────
+  # ── Redis (Event Queue Message Broker for BullMQ) ───────────────────────────
   redis:
     image: redis:7-alpine
     container_name: reelbite-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     volumes:
       - redis_data:/data
     networks:
       - reelbite-net
 
-  # ── Backend (Node.js / Express / Socket.IO) ───────────────────────────────
+  # ── Backend Application Server (Node.js / Express / Socket.IO) ───────────────
   backend:
     build:
       context: ./backend
@@ -33,8 +38,28 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       PORT: 5000
       NODE_ENV: production
+
+      # ── Adaptive Concurrency Controller Configuration ──────────────────────
+      ADAPTIVE_MIN_CONCURRENCY: ${ADAPTIVE_MIN_CONCURRENCY:-1}
+      ADAPTIVE_MAX_CONCURRENCY: ${ADAPTIVE_MAX_CONCURRENCY:-20}
+      ADAPTIVE_INITIAL_CONCURRENCY: ${ADAPTIVE_INITIAL_CONCURRENCY:-5}
+      ADAPTIVE_MONITOR_INTERVAL_MS: ${ADAPTIVE_MONITOR_INTERVAL_MS:-5000}
+      ADAPTIVE_COOLDOWN_MS: ${ADAPTIVE_COOLDOWN_MS:-15000}
+      ADAPTIVE_CPU_HIGH: ${ADAPTIVE_CPU_HIGH:-80}
+      ADAPTIVE_CPU_LOW: ${ADAPTIVE_CPU_LOW:-50}
+      ADAPTIVE_MEMORY_HIGH: ${ADAPTIVE_MEMORY_HIGH:-85}
+      ADAPTIVE_SCALE_UP_STEP: ${ADAPTIVE_SCALE_UP_STEP:-2}
+      ADAPTIVE_SCALE_DOWN_STEP: ${ADAPTIVE_SCALE_DOWN_STEP:-1}
+      ADAPTIVE_QUEUE_HIGH: ${ADAPTIVE_QUEUE_HIGH:-3}
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     volumes:
       # Persist uploaded files across container restarts
       - uploads:/app/public/uploads
@@ -43,7 +68,37 @@ services:
     ports:
       - "5000:5000"
 
-  # ── Frontend (React/Vite built, served by Nginx) ──────────────────────────
+  # ── Optional Dedicated Worker Pod (Horizontal Worker Scaling) ────────────────
+  # Enable with: docker compose --profile worker up (or scale with: --scale worker=2)
+  worker:
+    profiles: ["worker", "full"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: ["node", "workers/workerRunner.js"]
+    restart: unless-stopped
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      MONGODB_URL: ${MONGODB_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      NODE_ENV: production
+      ADAPTIVE_MIN_CONCURRENCY: ${ADAPTIVE_MIN_CONCURRENCY:-1}
+      ADAPTIVE_MAX_CONCURRENCY: ${ADAPTIVE_MAX_CONCURRENCY:-20}
+      ADAPTIVE_INITIAL_CONCURRENCY: ${ADAPTIVE_INITIAL_CONCURRENCY:-5}
+      ADAPTIVE_MONITOR_INTERVAL_MS: ${ADAPTIVE_MONITOR_INTERVAL_MS:-5000}
+      ADAPTIVE_COOLDOWN_MS: ${ADAPTIVE_COOLDOWN_MS:-15000}
+      ADAPTIVE_CPU_HIGH: ${ADAPTIVE_CPU_HIGH:-80}
+      ADAPTIVE_CPU_LOW: ${ADAPTIVE_CPU_LOW:-50}
+      ADAPTIVE_MEMORY_HIGH: ${ADAPTIVE_MEMORY_HIGH:-85}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - reelbite-net
+
+  # ── Frontend Web Tier (React / Vite Built, Served by Nginx) ─────────────────
   frontend:
     build:
       context: ./frontend
@@ -60,7 +115,8 @@ services:
     container_name: reelbite-frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - reelbite-net
     ports:

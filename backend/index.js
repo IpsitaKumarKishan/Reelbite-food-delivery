@@ -20,7 +20,8 @@ import reviewRouter from "./routes/review.routes.js"
 import analyticsRouter from "./routes/analytics.routes.js"
 import adminRouter from "./routes/admin.routes.js"
 import queueRouter from "./routes/queue.routes.js"
-import { initOrderWorker } from "./workers/order.worker.js"
+import { initOrderWorker, closeOrderWorker } from "./workers/order.worker.js"
+import { adaptiveController } from "./services/adaptiveController.service.js"
 import http from "http"
 import { Server } from "socket.io"
 import { socketHandler } from "./socket.js"
@@ -110,6 +111,9 @@ app.use("/api/queue", queueRouter)
 
 socketHandler(io)
 initOrderWorker(io)
+if (process.env.NODE_ENV !== "test") {
+  adaptiveController.start();
+}
 
 // Serve frontend static files if dist exists (Single-Server / Monolithic setup)
 if (fs.existsSync(frontendDistPath)) {
@@ -140,6 +144,25 @@ app.use((err, req, res, next) => {
   })
 })
 
+// Graceful shutdown handling for cloud production & container terminations
+const shutdown = async (signal) => {
+  console.log(`\n🛑 [Process] Received ${signal}. Starting graceful shutdown...`);
+  try {
+    adaptiveController.stop();
+    await closeOrderWorker();
+    server.close(() => {
+      console.log("✅ [Process] HTTP server closed cleanly.");
+      process.exit(0);
+    });
+  } catch (err) {
+    console.error("❌ [Process] Error during shutdown:", err.message);
+    process.exit(1);
+  }
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
 const start = async () => {
   try {
     await connectDb()
@@ -154,4 +177,3 @@ const start = async () => {
 }
 
 start()
-

@@ -117,10 +117,19 @@ const orderSchema = new mongoose.Schema({
         type:String,
         default:""
     },
-   razorpayPaymentId:{
-    type:String,
-       default:""
-   }
+    razorpayPaymentId:{
+        type:String,
+        default:""
+    },
+    // Distributed Queue Processing Idempotency Safeguards
+    notificationDispatched: {
+        type: Boolean,
+        default: false
+    },
+    notificationDispatchedAt: {
+        type: Date,
+        default: null
+    }
 }, { timestamps: true })
 
 orderSchema.index({ user: 1, createdAt: -1 });
