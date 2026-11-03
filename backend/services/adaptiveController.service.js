@@ -1,6 +1,7 @@
 import { ADAPTIVE_CONFIG } from "../config/adaptiveConfig.js";
 import { queueMonitor } from "./queueMonitor.service.js";
 import { resourceMonitor } from "./resourceMonitor.service.js";
+import { workerHealthMonitor } from "./workerHealth.service.js";
 
 /**
  * Adaptive Resource-Aware Worker Concurrency Controller
@@ -50,11 +51,13 @@ class AdaptiveControllerService {
    * Can accept explicit snapshots for deterministic unit testing.
    * @param {Object} queueSnap - Optional queue snapshot
    * @param {Object} resourceSnap - Optional resource snapshot
+   * @param {Object} healthSnap - Optional worker health snapshot
    * @returns {Object} Evaluation decision result
    */
-  evaluate(queueSnap = null, resourceSnap = null) {
+  evaluate(queueSnap = null, resourceSnap = null, healthSnap = null) {
     const queue = queueSnap || queueMonitor.getSnapshot();
     const resource = resourceSnap || resourceMonitor.getSnapshot();
+    const health = healthSnap || workerHealthMonitor.getSummary();
 
     const waiting = queue.counts?.waiting || 0;
     const active = queue.counts?.active || 0;
@@ -69,6 +72,39 @@ class AdaptiveControllerService {
     this.recentWaitingCounts.push(waiting);
     if (this.recentWaitingCounts.length > 4) {
       this.recentWaitingCounts.shift();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // RULE 0: FAULT TOLERANCE & RECOVERY HOLD
+    // If background workers are UNHEALTHY, TIMEOUT, or undergoing RECOVERY:
+    // Freeze all scale-up decisions and clamp concurrency to MIN_CONCURRENCY.
+    // ─────────────────────────────────────────────────────────────────────────
+    const isWorkerDegraded =
+      health &&
+      (health.unhealthyWorkers > 0 ||
+        health.recoveringWorkers > 0 ||
+        health.health === "DEGRADED" ||
+        health.health === "RECOVERING");
+
+    if (isWorkerDegraded) {
+      if (this.currentConcurrency > this.config.MIN_CONCURRENCY) {
+        const target = this.config.MIN_CONCURRENCY;
+        return this._applyAdjustment(
+          target,
+          waiting,
+          active,
+          cpu,
+          memory,
+          "FAULT_RECOVERY_CLAMP",
+          `FAULT TOLERANCE GUARD: Worker health is degraded/recovering (${health.unhealthyWorkers || 0} unhealthy, ${health.recoveringWorkers || 0} recovering). Clamping concurrency to minimum (${target}) to isolate failing nodes.`
+        );
+      }
+      return {
+        adjusted: false,
+        currentConcurrency: this.currentConcurrency,
+        rule: "FAULT_RECOVERY_HOLD",
+        reason: `FAULT TOLERANCE HOLD: Worker health is degraded/recovering. Scale-up frozen at minimum concurrency (${this.currentConcurrency}) until recovery resolves.`
+      };
     }
 
     // If controller is locked in fixed mode (for Experimentation A or B)

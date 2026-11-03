@@ -22,6 +22,7 @@ import adminRouter from "./routes/admin.routes.js"
 import queueRouter from "./routes/queue.routes.js"
 import { initOrderWorker, closeOrderWorker } from "./workers/order.worker.js"
 import { adaptiveController } from "./services/adaptiveController.service.js"
+import { recoveryController } from "./services/recoveryController.service.js"
 import http from "http"
 import { Server } from "socket.io"
 import { socketHandler } from "./socket.js"
@@ -111,6 +112,7 @@ app.use("/api/queue", queueRouter)
 
 socketHandler(io)
 initOrderWorker(io)
+recoveryController.setSocketIO(io)
 if (process.env.NODE_ENV !== "test") {
   adaptiveController.start();
 }

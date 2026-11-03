@@ -1,0 +1,76 @@
+{
+  "generatedAt": "2026-11-03T10:07:38.974Z",
+  "architecture": "ReelBite Autonomous Fault Tolerance & Self-Healing Worker Cluster",
+  "experiments": [
+    {
+      "experiment": "Experiment A: Baseline Normal Processing",
+      "totalJobs": 50,
+      "completedJobs": 50,
+      "failedJobs": 0,
+      "retriedJobs": 0,
+      "duplicateExecutions": 0,
+      "permanentFailureRate": "0.0%",
+      "mttdMs": 0,
+      "mttrMs": 0,
+      "totalDurationMs": 780,
+      "throughputJobsPerSec": 64.1,
+      "avgProcessingLatencyMs": 16,
+      "systemHealth": "100.0% HEALTHY",
+      "observations": "Zero failures occurred; processing executed cleanly within baseline operating parameters."
+    },
+    {
+      "experiment": "Experiment B: Worker Crash & Self-Healing",
+      "totalJobs": 50,
+      "completedJobs": 50,
+      "failedJobs": 0,
+      "retriedJobs": 1,
+      "duplicateExecutions": 0,
+      "permanentFailureRate": "0.0%",
+      "mttdMs": 36,
+      "mttrMs": 46,
+      "restartsCount": 1,
+      "totalDurationMs": 827,
+      "observations": "Worker crash detected in 36ms (MTTD). Autonomous self-healing recreated worker instance in 46ms (MTTR). In-flight stalled job safely redelivered with 0 dropped orders."
+    },
+    {
+      "experiment": "Experiment C: Redis Broker Disconnection",
+      "totalJobs": 50,
+      "completedJobs": 50,
+      "failedJobs": 0,
+      "retriedJobs": 0,
+      "duplicateExecutions": 0,
+      "permanentFailureRate": "0.0%",
+      "mttdMs": 0,
+      "mttrMs": 79,
+      "downtimeDrainedMs": 65,
+      "totalDurationMs": 856,
+      "observations": "Redis disconnect detected in 0ms. Client backoff held worker queue without crashing. Broker reconnected cleanly in 79ms."
+    },
+    {
+      "experiment": "Experiment D: Database Transient Hiccups",
+      "totalJobs": 50,
+      "completedJobs": 50,
+      "failedJobs": 0,
+      "transientHiccupsInjected": 3,
+      "transientRetriesSucceeded": 3,
+      "duplicateExecutions": 0,
+      "permanentFailureRate": "0.0%",
+      "totalDurationMs": 873,
+      "observations": "3 transient MongoDB failovers intercepted. All 3 transient retries recovered through exponential backoff with zero unhandled errors."
+    },
+    {
+      "experiment": "Experiment E: High Concurrency Duplicate Submissions",
+      "uniqueOrders": 20,
+      "totalSubmittedJobs": 60,
+      "actualProcessedOrders": 20,
+      "bypassedDuplicates": 0,
+      "concurrentLockRejections": 40,
+      "totalNotificationsDispatched": 20,
+      "duplicateExecutions": 0,
+      "duplicateNotifications": 0,
+      "idempotencyInvariantSatisfied": true,
+      "totalDurationMs": 15,
+      "observations": "Processed 60 duplicate job submissions across 20 distinct orders. Atomic distributed locking and dual-state guards suppressed 40 duplicate runs. Exactly 20 restaurant notifications dispatched (Duplicate Count = 0)."
+    }
+  ]
+}

@@ -129,6 +129,27 @@ const orderSchema = new mongoose.Schema({
     notificationDispatchedAt: {
         type: Date,
         default: null
+    },
+    orderProcessingStatus: {
+        type: String,
+        enum: ["PENDING", "PROCESSING", "COMPLETED", "FAILED"],
+        default: "PENDING"
+    },
+    processingLock: {
+        type: String,
+        default: null
+    },
+    processingLockedAt: {
+        type: Date,
+        default: null
+    },
+    processingAttempts: {
+        type: Number,
+        default: 0
+    },
+    processedAt: {
+        type: Date,
+        default: null
     }
 }, { timestamps: true })
 
@@ -138,6 +159,8 @@ orderSchema.index({ "shopOrders.shop": 1, "shopOrders.status": 1 });
 orderSchema.index({ "shopOrders.assignedDeliveryBoy": 1 });
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ "cancellation.isCancelled": 1, createdAt: -1 });
+orderSchema.index({ orderProcessingStatus: 1 });
+orderSchema.index({ processingLock: 1 });
 
 const Order=mongoose.model("Order",orderSchema)
 export default Order

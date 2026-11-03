@@ -3,7 +3,12 @@ import {
   getInfrastructureMetrics,
   updateControllerMode,
   simulateTrafficSpike,
-  retryFailedJob
+  retryFailedJob,
+  getIncidents,
+  getDlqJobs,
+  retryDlqJob,
+  discardDlqJob,
+  simulateFailureScenario
 } from "../controllers/infrastructure.controllers.js";
 import isAuth from "../middlewares/isAuth.js";
 import isAdmin from "../middlewares/isAdmin.js";
@@ -36,6 +41,36 @@ router.post("/simulate-traffic", simulateTrafficSpike);
  * @desc Resubmit a job from Dead Letter Queue (DLQ)
  */
 router.post("/retry/:jobId", retryFailedJob);
+
+/**
+ * @route GET /api/admin/infrastructure/incidents
+ * @desc Get paginated incident tickets and MTTR/MTTD analytics
+ */
+router.get("/incidents", getIncidents);
+
+/**
+ * @route GET /api/admin/infrastructure/dlq
+ * @desc Get paginated Dead Letter Queue items
+ */
+router.get("/dlq", getDlqJobs);
+
+/**
+ * @route POST /api/admin/infrastructure/dlq/retry/:jobId
+ * @desc Controlled manual DLQ job retry with deduplication checks
+ */
+router.post("/dlq/retry/:jobId", retryDlqJob);
+
+/**
+ * @route POST /api/admin/infrastructure/dlq/discard/:jobId
+ * @desc Permanently discard a non-recoverable DLQ job
+ */
+router.post("/dlq/discard/:jobId", discardDlqJob);
+
+/**
+ * @route POST /api/admin/infrastructure/simulate-failure
+ * @desc Controlled failure injection for demonstration and defense evaluations
+ */
+router.post("/simulate-failure", simulateFailureScenario);
 
 export default router;
 

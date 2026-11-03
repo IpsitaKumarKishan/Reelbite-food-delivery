@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { orderQueue, getDeadLetterJobs, retryDeadLetterJob } from "../queues/order.queue.js";
 import { WorkerHealthService } from "../services/workerHealth.service.js";
+import { RECOVERY_CONFIG } from "../config/recoveryConfig.js";
 
 test("Phase 5: Queue Retry & Dead Letter Queue (DLQ) Configuration", async (t) => {
   await t.test("verifies exponential backoff and DLQ retention defaults", () => {
@@ -9,7 +10,11 @@ test("Phase 5: Queue Retry & Dead Letter Queue (DLQ) Configuration", async (t) =
       const opts = orderQueue.defaultJobOptions;
       assert.equal(opts.attempts, 3, "Queue must configure 3 retry attempts");
       assert.equal(opts.backoff?.type, "exponential", "Retry must use exponential backoff");
-      assert.equal(opts.backoff?.delay, 1500, "Initial backoff delay must be 1500ms");
+      assert.equal(
+        opts.backoff?.delay,
+        RECOVERY_CONFIG.JOB_BACKOFF_INITIAL_MS,
+        "Initial backoff delay must match configured initial backoff"
+      );
       assert.equal(opts.removeOnFail, false, "Failed jobs must not be deleted; preserved in DLQ");
       assert.equal(opts.removeOnComplete, 100, "Last 100 completed jobs preserved for metrics");
     }

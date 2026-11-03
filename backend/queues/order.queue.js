@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
 import { redisConnectionOptions, REDIS_URL, getRedisStatus } from "../config/redis.js";
+import { RECOVERY_CONFIG } from "../config/recoveryConfig.js";
 
 export const ORDER_QUEUE_NAME = "order-events";
 
@@ -12,10 +13,10 @@ try {
       ...redisConnectionOptions
     },
     defaultJobOptions: {
-      attempts: 3,
+      attempts: RECOVERY_CONFIG.JOB_MAX_ATTEMPTS || 3,
       backoff: {
         type: "exponential",
-        delay: 1500 // 1.5s, 3s, 6s
+        delay: RECOVERY_CONFIG.JOB_BACKOFF_INITIAL_MS || 1000 // 1s, 2s, 4s
       },
       removeOnComplete: 100, // Keep last 100 completed for history
       removeOnFail: false     // Keep failed jobs in Dead Letter Queue (DLQ)
